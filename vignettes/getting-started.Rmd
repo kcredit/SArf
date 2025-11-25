@@ -1,6 +1,6 @@
 ---
 title: "Getting Started with SArf"
-author: "Kevin Credit, Kaur Damanpreet, Emma Eccles"
+author: "Kevin Credit"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -13,384 +13,314 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.width = 7,
-  fig.height = 5
+  eval = FALSE
 )
 ```
 
-## Introduction
+# Introduction
 
-SArf (Spatial Autoregressive Random Forest) provides a comprehensive framework for spatial machine learning with proper uncertainty quantification. This vignette demonstrates how to use SArf for spatial analysis.
+This vignette demonstrates how to use the SArf package for spatial autoregressive random forest analysis from start to finish.
 
-## Installation
+# Installation
 
-```{r eval=FALSE}
-# Install from GitHub
-devtools::install_github("kcredit/SArf")
+## One-Time Setup
+
+```{r install}
+# Install development tools
+install.packages("devtools")
+install.packages("roxygen2")
+
+# Install SArf dependencies
+install.packages(c(
+  "ranger", "sf", "spdep", "spatialreg", "blockCV", "ALEPlot",
+  "ggplot2", "dplyr", "tidyr", "leaflet", "htmltools"
+))
+
+# Install SArf from GitHub
+devtools::install_github("YOUR-USERNAME/SArf")
+
+# Or from local directory
+setwd("~/path/to/SArf")
+devtools::document()
+devtools::install()
+
+# IMPORTANT: Restart R session after installation!
 ```
 
-## Load Package and Data
+# Load Libraries
 
-```{r eval=FALSE}
+```{r libraries}
 library(SArf)
 library(sf)
+library(dplyr)
 
-# Load your spatial data
-data <- st_read("your_data.shp")
-
-# Data should be an sf object with:
-# - A response variable (outcome)
-# - Predictor variables
-# - Spatial geometry
+# Note: Only load these three to avoid conflicts!
 ```
 
-## Basic Usage
+# Data Preparation
 
-### Run Complete Analysis
+## Load and Clean Data
 
-```{r eval=FALSE}
+```{r load_clean}
+# Read spatial data
+data <- st_read("path/to/your_data.shp")
+
+# Clean the data
+data_clean <- data %>%
+  # Remove missing outcome
+  filter(!is.na(your_outcome_variable)) %>%
+  # Ensure numeric
+  mutate(your_outcome_variable = as.numeric(your_outcome_variable)) %>%
+  # Remove missing predictors
+  filter(complete.cases(predictor1, predictor2, predictor3)) %>%
+  # Fix invalid geometries
+  filter(st_is_valid(.))
+
+# Fix duplicate coordinates (IMPORTANT!)
+st_geometry(data_clean) <- st_jitter(st_geometry(data_clean), amount = 0.00001)
+
+# Transform to projected CRS (required for spatial blocking)
+data_clean <- st_transform(data_clean, 3857)
+
+# Check data
+cat("Cleaned data:", nrow(data_clean), "rows\n")
+summary(data_clean$your_outcome_variable)
+cat("Any NAs?", sum(is.na(data_clean$your_outcome_variable)), "\n")
+```
+
+## Choose Parameters Based on Dataset Size
+
+```{r size_params}
+n_rows <- nrow(data_clean)
+cat("Dataset size:", n_rows, "rows\n")
+
+if (n_rows < 1000) {
+  n_folds <- 5
+  n_bootstrap <- 20
+  num_trees <- 500
+  cat("Using full analysis parameters\n")
+} else if (n_rows < 3000) {
+  n_folds <- 5
+  n_bootstrap <- 10
+  num_trees <- 500
+  cat("Using moderate parameters\n")
+} else {
+  cat("Large dataset. Sampling 3000 rows...\n")
+  set.seed(1111)
+  data_clean <- slice_sample(data_clean, n = 3000)
+  n_folds <- 3
+  n_bootstrap <- 5
+  num_trees <- 250
+}
+```
+
+## Calculate Block Range
+
+```{r block_range}
+# Get bounding box
+bbox <- st_bbox(data_clean)
+
+# Calculate dimensions
+width <- bbox["xmax"] - bbox["xmin"]
+height <- bbox["ymax"] - bbox["ymin"]
+
+# Use 1/3 of smaller dimension
+block_range <- min(width, height) / 3
+
+cat("Suggested block_range:", round(block_range), "meters\n")
+
+# Rough guides:
+# Neighbourhood: 500-1000m
+# City: 5000-10000m
+# County: 12500-25000m
+# Region: 50000-100000m
+```
+
+# Run SArf Analysis
+
+```{r run_sarf}
 results <- SArf(
   formula = outcome ~ predictor1 + predictor2 + predictor3,
-  data = data,
-  k_neighbors = 20,
-  n_folds = 5,
-  n_bootstrap = 20
+  data = data_clean,
+  k_neighbors = 10,
+  n_folds = n_folds,
+  n_bootstrap = n_bootstrap,
+  num_trees = num_trees,
+  create_map = TRUE,
+  block_range = block_range,
+  verbose = TRUE
 )
 ```
 
-### View Results
+# View Results
 
-```{r eval=FALSE}
+```{r view_results}
 # Print summary
 print(results)
 
 # Detailed summary
 summary(results)
 
-# Visualize
-plot(results, which = "all")
-```
-
-## Step-by-Step Workflow
-
-### Step 1: Test for Spatial Autocorrelation
-
-SArf automatically tests whether your outcome variable has spatial structure:
-
-```{r eval=FALSE}
-# View Moran's I test
+# Specific outputs
 results$moran_test
-
-# Visualize spatial autocorrelation
-print(results$moran_plot)
-```
-
-**Interpretation:**
-- Moran's I near 0: No spatial autocorrelation
-- Positive I: Clustering (similar values near each other)
-- Negative I: Dispersion (dissimilar values near each other)
-- p < 0.05: Significant spatial structure
-
-### Step 2: Spatial Cross-Validation
-
-SArf uses spatial blocking to prevent data leakage:
-
-```{r eval=FALSE}
-# CV performance metrics
-results$spatial_cv_results$metrics
-```
-
-**Metrics:**
-- `rmse`: Root mean squared error
-- `r2`: Coefficient of determination
-- `morans_i`: Moran's I on residuals (should be near 0)
-
-### Step 3: Model Comparison
-
-Compare RF to traditional spatial econometric models:
-
-```{r eval=FALSE}
-# View comparison table
+results$moran_plot
 results$model_comparison
-
-# Best performing model
-best_model <- results$model_comparison[
-  which.min(results$model_comparison$RMSE),
-]
-print(best_model)
-```
-
-**Models compared:**
-- OLS: Ordinary least squares (no spatial structure)
-- SAR: Spatial autoregressive (spatial lag model)
-- SEM: Spatial error model
-- SAC: Combined spatial lag + error
-- RF_Spatial_CV: Random forest with spatial lag
-
-### Step 4: Variable Importance
-
-See which predictors matter most:
-
-```{r eval=FALSE}
-# Importance table with CIs
 results$variable_importance
-
-# Visualize
-print(results$importance_plot)
-```
-
-**Key points:**
-- Bootstrap confidence intervals show uncertainty
-- `spatial_lag` importance indicates neighborhood effects
-- Non-overlapping CIs = significantly different importance
-
-### Step 5: Effect Visualization (ALE)
-
-Understand how each predictor affects the outcome:
-
-```{r eval=FALSE}
-# View ALE plots
-print(results$ale_plots)
-
-# Access raw ALE data
-head(results$ale_results)
-```
-
-**Interpreting ALE plots:**
-- Y-axis: Change in predicted outcome
-- X-axis: Predictor value
-- Shaded area: 95% confidence interval
-- Flat line = No effect
-- Steep slope = Strong effect
-- Curved line = Non-linear relationship
-
-### Step 6: Spatial Visualization
-
-Explore results spatially:
-
-```{r eval=FALSE}
-# Interactive map
+results$importance_plot
+results$ale_results
+results$ale_plots
 results$leaflet_map
-
-# Save to HTML
-library(htmlwidgets)
-saveWidget(results$leaflet_map, "results_map.html")
 ```
 
-## Advanced Options
+# Access Spatial Models
 
-### Custom Spatial Weights
+```{r access_models}
+# Access fitted models
+summary(results$ols_model)
+summary(results$sar_model)
+summary(results$sem_model)
+summary(results$sac_model)
 
-```{r eval=FALSE}
-# Fewer neighbors (more local)
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data,
-  k_neighbors = 8
-)
+# Get coefficients
+coef(results$sar_model)
 
-# More neighbors (more regional)
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data,
-  k_neighbors = 30
-)
+# Get spatial parameters
+results$sar_model$rho
+results$sem_model$lambda
 ```
 
-### Adjust Cross-Validation
+# Save Outputs
 
-```{r eval=FALSE}
-# More robust (but slower)
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data,
-  n_folds = 10,         # More folds
-  n_bootstrap = 50,     # More iterations
-  block_range = 2000    # Larger blocks (meters)
-)
-```
-
-### Select Comparison Models
-
-```{r eval=FALSE}
-# Only compare to SAR
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data,
-  compare_models = c("SAR")
-)
-```
-
-### Disable Mapping
-
-```{r eval=FALSE}
-# Skip map creation (faster)
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data,
-  create_map = FALSE
-)
-```
-
-## Extracting Components
-
-### Get Predictions
-
-```{r eval=FALSE}
-# Mean predictions with uncertainty
-preds <- results$spatial_cv_results$predictions_summary
-head(preds)
-# pred_mean, pred_sd, observed
-
-# Add to original data
-data$rf_prediction <- preds$pred_mean
-data$rf_uncertainty <- preds$pred_sd
-```
-
-### Access Models
-
-```{r eval=FALSE}
-# All bootstrap models
-all_models <- results$spatial_cv_results$models
-
-# Example: Get first model
-model_1 <- all_models[[1]]$model
-print(model_1)
-
-# Access spatial econometric models
-sar_model <- results$model_details$SAR
-summary(sar_model)
-```
-
-### Export Results
-
-```{r eval=FALSE}
-# Save importance table
-write.csv(results$variable_importance, "importance.csv")
-
-# Save model comparison
-write.csv(results$model_comparison, "model_comparison.csv")
-
-# Save ALE data
-write.csv(results$ale_results, "ale_data.csv")
+```{r save}
+# Create output directory
+dir.create("output", showWarnings = FALSE)
 
 # Save plots
-ggsave("importance.png", results$importance_plot)
-ggsave("ale_plots.png", results$ale_plots, width = 10, height = 8)
+ggsave("output/moran_plot.png", results$moran_plot, width = 6, height = 5)
+ggsave("output/importance_plot.png", results$importance_plot, width = 8, height = 6)
+ggsave("output/ale_plots.png", results$ale_plots, width = 10, height = 8)
+
+# Save tables
+write.csv(results$model_comparison, "output/model_comparison.csv", row.names = FALSE)
+write.csv(results$variable_importance, "output/variable_importance.csv", row.names = FALSE)
+write.csv(results$ale_results, "output/ale_data.csv", row.names = FALSE)
+
+# Save map
+library(htmlwidgets)
+saveWidget(results$leaflet_map, "output/results_map.html")
+
+cat("\nAll outputs saved!\n")
 ```
 
-## Example: Health Rating Index
+# Real Example: Health Rating Index for Dublin
 
-This example uses the methodology from Credit et al. (2025):
+```{r dublin_example}
+# Load Dublin health data
+data <- st_read("SA2022_Dublin_AllData.shp") %>%
+  filter(!is.na(HRI_gaus_n)) %>%
+  mutate(HRI_gaus_n = as.numeric(HRI_gaus_n)) %>%
+  filter(complete.cases(HRI_gaus_n, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
+  filter(st_is_valid(.))
 
-```{r eval=FALSE}
-# Health Rating Index analysis
-hri_results <- SArf(
-  formula = HRI ~ In22_ED + NoAuto_p + BVBHth_p + POPD + log_dist,
-  data = dublin_data,
-  k_neighbors = 20,
-  n_folds = 5,
-  n_bootstrap = 20
-)
+# Prepare data
+st_geometry(data) <- st_jitter(st_geometry(data), amount = 0.00001)
+data <- st_transform(data, 3857)
 
-# Check spatial autocorrelation in HRI
-hri_results$moran_test
-# Moran's I = 0.78, p < 0.001 (strong spatial clustering)
+# Calculate block range for Dublin (~20km)
+bbox <- st_bbox(data)
+block_range <- min(bbox["xmax"] - bbox["xmin"], 
+                   bbox["ymax"] - bbox["ymin"]) / 3
 
-# Compare to spatial models
-hri_results$model_comparison
-# RF performs similarly to SAC, better than OLS/SAR/SEM
-
-# Key predictors of health
-hri_results$variable_importance
-# 1. spatial_lag (neighborhood effects)
-# 2. In22_ED (deprivation)
-# 3. log_dist (distance to major roads)
-
-# Non-linear relationships
-print(hri_results$ale_plots)
-# Shows how deprivation has threshold effects
-```
-
-## Troubleshooting
-
-### Moran's I Not Significant
-
-If spatial autocorrelation is not significant, spatial methods may not be necessary:
-
-```{r eval=FALSE}
-if (results$moran_test$p.value > 0.05) {
-  warning("No significant spatial autocorrelation. Consider regular RF.")
-  # But SArf still runs and compares models
-}
-```
-
-### Long Runtime
-
-Reduce computational burden:
-
-```{r eval=FALSE}
-# Faster options
+# Run analysis
 results <- SArf(
-  formula = y ~ x1 + x2,
+  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
-  n_folds = 3,          # Fewer folds
-  n_bootstrap = 10,     # Fewer iterations
-  num_trees = 250,      # Fewer trees
-  create_map = FALSE    # Skip mapping
+  k_neighbors = 10,
+  n_folds = 3,
+  n_bootstrap = 5,
+  num_trees = 250,
+  block_range = block_range,
+  verbose = TRUE
 )
+
+# View results
+print(results)
+results$model_comparison
+results$importance_plot
+results$ale_plots
 ```
 
-### Memory Issues
+# Interpretation Guide
 
-For large datasets:
+## Model Comparison
 
-```{r eval=FALSE}
-# Sample data first
-library(dplyr)
-data_sample <- data %>% slice_sample(n = 2000)
+- **RMSE**: Lower is better
+- **R²**: Higher is better (0-1 scale)
+- **Moran's I**: Close to 0 indicates no spatial autocorrelation in residuals
+- **Typically**: RF > spatial models for R², spatial models remove autocorrelation
 
-# Run on sample
-results <- SArf(
-  formula = y ~ x1 + x2,
-  data = data_sample
-)
+## Variable Importance
+
+- High mean = strong predictor
+- Narrow CI = consistent across folds
+- spatial_lag often important (neighborhood effects)
+
+## ALE Plots
+
+- Positive slope = positive effect
+- Negative slope = negative effect
+- Curves = non-linear relationships
+- Confidence bands = uncertainty
+
+# Tips and Best Practices
+
+**Dataset Size:**
+- < 1000: Full parameters
+- 1000-3000: Moderate parameters
+- 3000: Sample or reduce parameters
+
+**Block Range:**
+- Too small → "same area" error
+- Too large → empty folds
+- Start with min(width, height) / 3
+
+**Performance:**
+- 500 obs: ~5 min
+- 1000 obs: ~10 min
+- 2000 obs: ~20 min
+- 3000 obs: ~45 min
+
+**Avoid Conflicts:**
+- Only load: SArf, sf, dplyr
+- Don't load ranger, spdep, etc. directly
+
+# Troubleshooting
+
+**"All points from same area"**
+- Increase block_range
+- Reduce n_folds
+
+**Moran's I shows NA**
+- Check for missing values
+- Ensure no duplicate coordinates
+
+**Very slow**
+- Sample to 2000-3000 rows
+- Reduce n_bootstrap to 3-5
+
+# Citation
+
+```
+Credit, K. (2025). SArf: Spatial Autoregressive 
+Random Forest. https://github.com/kcredit/SArf
+
+Credit, K., Kumar, D., & Eccles, E. (2025). Exploring the 
+transport-health-environment nexus through a new 'Health Rating Index'. 
+Proceedings of the 33rd GISRUK Conference. DOI: 10.5281/zenodo.15183740
 ```
 
-## Best Practices
+# Session Info
 
-1. **Check your data:**
-   - Ensure sf object with valid geometries
-   - Check for missing values
-   - Transform to appropriate CRS
-
-2. **Start with defaults:**
-   - 5 folds, 20 bootstrap iterations is usually sufficient
-   - Adjust based on dataset size and available time
-
-3. **Interpret carefully:**
-   - Look at multiple metrics (RMSE, R², Moran's I)
-   - Consider practical significance, not just statistical
-   - Check if spatial lag is important (indicates spatial process)
-
-4. **Validate assumptions:**
-   - Check residual spatial autocorrelation
-   - Compare to simpler models (OLS)
-   - Ensure ALE plots make substantive sense
-
-## References
-
-Credit, K., Damanpreet, K., and Eccles, E. (2025). Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland. *Proceedings of the 33rd GISRUK Conference*. DOI: 10.5281/zenodo.15183740
-
-## Getting Help
-
-```{r eval=FALSE}
-# Package documentation
-?SArf
-
-# Function help
-?spatial_cv_rf
-
-# Report issues
-# https://github.com/kcredit/SArf/issues
+```{r sessioninfo}
+sessionInfo()
 ```

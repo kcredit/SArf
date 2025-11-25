@@ -58,9 +58,9 @@ See the [Health Rating Index for Dublin](https://github.com/YOUR-USERNAME/health
 ```bibtex
 @software{sarf2025,
   title = {SArf: Spatial Autoregressive Random Forest},
-  author = {Credit, Kevin and Kumar, Damanpreet and Eccles, Elizabeth},
+  author = {Credit, Kevin},
   year = {2025},
-  url = {https://github.com/YOUR-USERNAME/SArf}
+  url = {https://github.com/kcredit/SArf}
 }
 ```
 
