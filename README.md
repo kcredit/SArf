@@ -19,7 +19,7 @@ SArf implements a **Spatial Autoregressive Random Forest** methodology that trea
 ```r
 # Install from GitHub
 # install.packages("devtools")
-devtools::install_github("kcredit/SArf")
+devtools::install_github("YOUR-USERNAME/SArf")
 ```
 
 ## Quick Start
@@ -28,15 +28,15 @@ devtools::install_github("kcredit/SArf")
 library(SArf)
 library(sf)
 
-# Load your spatial data
-data <- st_read("your_data.shp") %>%
-  st_transform(3857)
+# Load data (included with package)
+data_path <- system.file("extdata", "model_data.shp", package = "SArf")
+data <- st_read(data_path)
 
 # Run complete spatial analysis
 results <- SArf(
-  formula = outcome ~ predictor1 + predictor2,
+  formula = HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
-  k_neighbors = 8,
+  k_neighbors = 10,
   n_folds = 3,
   n_bootstrap = 5
 )
@@ -47,13 +47,32 @@ results$model_comparison
 results$importance_plot
 results$ale_plots
 results$leaflet_map
+
+# Save outputs
+dir.create("output", showWarnings = FALSE)
+ggsave("output/importance_plot.png", results$importance_plot)
+write.csv(results$model_comparison, "output/model_comparison.csv")
 ```
 
-## Real-World Application
+## Origin & Real-World Application
 
-See the [Health Rating Index for Dublin](https://github.com/YOUR-USERNAME/health-rating-index) project for a complete application analyzing environmental health across 3,000+ small areas.
+**SArf was developed as part of the Health Rating Index project for Dublin, Ireland.**
+
+This package emerged from research analyzing environmental health burdens and benefits across 3,000+ small areas in Dublin. The methodology and package were created to properly handle spatial autocorrelation in health-environment relationships while capturing non-linear effects that traditional spatial econometric models miss.
+
+**📊 Full Project:** [Health Rating Index for Dublin](https://github.com/kcredit/health-rating-index)
+- Complete analysis code
+- Full datasets (air quality, noise, accessibility, deprivation)
+- Reproducible workflow
+- Publication materials
+
+**📖 Publication:** Credit, K., Kumar, D., and Eccles, E. (2025). "Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland." *Proceedings of the 33rd GISRUK Conference.* DOI: [10.5281/zenodo.15183740](https://doi.org/10.5281/zenodo.15183740)
+
+The sample data included with this package (`dublin_sample.shp`) is a subset of 100 small areas from the full Dublin analysis, allowing users to quickly test the package and understand the methodology.
 
 ## Citation
+
+If you use SArf in your research, please cite:
 
 ```bibtex
 @software{sarf2025,
@@ -61,6 +80,18 @@ See the [Health Rating Index for Dublin](https://github.com/YOUR-USERNAME/health
   author = {Credit, Kevin},
   year = {2025},
   url = {https://github.com/kcredit/SArf}
+}
+```
+
+And if applicable, the methodological paper:
+
+```bibtex
+@inproceedings{credit2025health,
+  title = {Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland},
+  author = {Credit, Kevin and Kumar, Damanpreet and Eccles, Elizabeth},
+  booktitle = {Proceedings of the 33rd GISRUK Conference},
+  year = {2025},
+  doi = {10.5281/zenodo.15183740}
 }
 ```
 

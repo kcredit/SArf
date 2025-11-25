@@ -37,12 +37,12 @@ install.packages(c(
 ))
 
 # Install SArf from GitHub
-devtools::install_github("YOUR-USERNAME/SArf")
+devtools::install_github("kcredit/SArf")
 
 # Or from local directory
-setwd("~/path/to/SArf")
-devtools::document()
-devtools::install()
+# setwd("~/path/to/SArf")
+# devtools::document()
+# devtools::install()
 
 # IMPORTANT: Restart R session after installation!
 ```
@@ -57,26 +57,44 @@ library(dplyr)
 # Note: Only load these three to avoid conflicts!
 ```
 
-# Data Preparation
+# Real Example: Health Rating Index for Dublin
 
-## Load and Clean Data
+This example uses the full dataset from the Health Rating Index project.
 
-```{r load_clean}
-# Read spatial data
-data <- st_read("path/to/your_data.shp")
+**Project Background:** SArf was developed as part of research analyzing environmental health burdens and benefits across Dublin, Ireland. The full project is available at https://github.com/kcredit/health-rating-index
+
+## Load Data
+
+```{r dublin_example}
+# Load included data
+data_path <- system.file("extdata", "model_data.shp", package = "SArf")
+data <- st_read(data_path)
+
+# Check the data
+cat("Dataset size:", nrow(data), "small areas\n")
+summary(data$HRI_gaus_n)
+
+# Variables included:
+# - HRI_gaus_n: Health Rating Index (outcome)
+# - In22_ED: Deprivation index
+# - NoAuto_p: % households without car
+# - POPD: Population density
+# - log_dist: Log distance to city center
+# - ov60: % over 60 years old
+# - nonIrish: % non-Irish nationals
 
 # Clean the data
 data_clean <- data %>%
   # Remove missing outcome
-  filter(!is.na(your_outcome_variable)) %>%
+  filter(!is.na(HRI_gaus_n)) %>%
   # Ensure numeric
-  mutate(your_outcome_variable = as.numeric(your_outcome_variable)) %>%
-  # Remove missing predictors
-  filter(complete.cases(predictor1, predictor2, predictor3)) %>%
+  mutate(your_outcome_variable = as.numeric(HRI_gaus_n)) %>%
+  # Remove missing predictors (add all your predictor names)
+  filter(complete.cases(HRI_gaus_n, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
   # Fix invalid geometries
   filter(st_is_valid(.))
 
-# Fix duplicate coordinates (IMPORTANT!)
+# Fix duplicate coordinates (important!)
 st_geometry(data_clean) <- st_jitter(st_geometry(data_clean), amount = 0.00001)
 
 # Transform to projected CRS (required for spatial blocking)
@@ -84,114 +102,99 @@ data_clean <- st_transform(data_clean, 3857)
 
 # Check data
 cat("Cleaned data:", nrow(data_clean), "rows\n")
-summary(data_clean$your_outcome_variable)
-cat("Any NAs?", sum(is.na(data_clean$your_outcome_variable)), "\n")
+summary(data_clean$HRI_gaus_p)
+
+cat("Any NAs?", sum(is.na(data_clean$HRI_gaus_p)), "\n")
 ```
 
-## Choose Parameters Based on Dataset Size
+## Calculate Parameters
 
-```{r size_params}
+```{r calc_params}
 n_rows <- nrow(data_clean)
 cat("Dataset size:", n_rows, "rows\n")
 
+# Choose parameters based on size
 if (n_rows < 1000) {
+  # Small dataset - full analysis
   n_folds <- 5
   n_bootstrap <- 20
   num_trees <- 500
   cat("Using full analysis parameters\n")
+  
 } else if (n_rows < 3000) {
+  # Medium dataset - moderate
   n_folds <- 5
   n_bootstrap <- 10
   num_trees <- 500
-  cat("Using moderate parameters\n")
+  cat("Using moderate analysis parameters\n")
+  
 } else {
-  cat("Large dataset. Sampling 3000 rows...\n")
+  # Very large - sample first
+  cat("Very large dataset. Sampling 3000 rows...\n")
   set.seed(1111)
-  data_clean <- slice_sample(data_clean, n = 3000)
+  data <- slice_sample(data_clean, n = 3000)
   n_folds <- 3
   n_bootstrap <- 5
   num_trees <- 250
 }
-```
 
-## Calculate Block Range
+cat("If your data are very large, you can alternatively (or additionally) increase the block range (rough guides):
+    Neighbourhood: 500-1000m
+    City: 5000-10000m
+    County: 12500-25000m
+    Region/Country: 50000-100000m", "\n")
 
-```{r block_range}
-# Get bounding box
-bbox <- st_bbox(data_clean)
+# Get bounding box of your data
+bbox <- st_bbox(data)
 
-# Calculate dimensions
+# Calculate width and height (in meters if projected)
 width <- bbox["xmax"] - bbox["xmin"]
 height <- bbox["ymax"] - bbox["ymin"]
 
-# Use 1/3 of smaller dimension
-block_range <- min(width, height) / 3
+# Use smaller dimension (more conservative)
+min_dimension <- min(width, height)/3
 
-cat("Suggested block_range:", round(block_range), "meters\n")
-
-# Rough guides:
-# Neighbourhood: 500-1000m
-# City: 5000-10000m
-# County: 12500-25000m
-# Region: 50000-100000m
 ```
 
-# Run SArf Analysis
+## Run Analysis
 
-```{r run_sarf}
+```{r run_dublin}
+# Run SArf analysis
 results <- SArf(
-  formula = outcome ~ predictor1 + predictor2 + predictor3,
-  data = data_clean,
-  k_neighbors = 10,
-  n_folds = n_folds,
-  n_bootstrap = n_bootstrap,
-  num_trees = num_trees,
-  create_map = TRUE,
-  block_range = block_range,
-  verbose = TRUE
+  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
+  data = data,
+  k_neighbors = 10,            # Number of neighbors for spatial weights
+  n_folds = n_folds,           # Spatial CV folds
+  n_bootstrap = n_bootstrap,   # Bootstrap iterations
+  num_trees = num_trees,       # Trees in random forest
+  create_map = TRUE,           # Spatial folds map
+  block_range = min_dimension, # Size of the spatial blocks in units of metres
+  verbose = TRUE               # Print progress
 )
 ```
 
-# View Results
+## View Results
 
-```{r view_results}
+```{r view_dublin_results}
 # Print summary
 print(results)
 
-# Detailed summary
-summary(results)
-
-# Specific outputs
-results$moran_test
-results$moran_plot
+# Model comparison
 results$model_comparison
-results$variable_importance
+
+# Variable importance
 results$importance_plot
-results$ale_results
+
+# ALE plots
 results$ale_plots
+
+# Interactive map
 results$leaflet_map
 ```
 
-# Access Spatial Models
+## Save Outputs
 
-```{r access_models}
-# Access fitted models
-summary(results$ols_model)
-summary(results$sar_model)
-summary(results$sem_model)
-summary(results$sac_model)
-
-# Get coefficients
-coef(results$sar_model)
-
-# Get spatial parameters
-results$sar_model$rho
-results$sem_model$lambda
-```
-
-# Save Outputs
-
-```{r save}
+```{r save_outputs}
 # Create output directory
 dir.create("output", showWarnings = FALSE)
 
@@ -209,46 +212,16 @@ write.csv(results$ale_results, "output/ale_data.csv", row.names = FALSE)
 library(htmlwidgets)
 saveWidget(results$leaflet_map, "output/results_map.html")
 
-cat("\nAll outputs saved!\n")
+cat("All outputs saved to output/ directory\n")
 ```
 
-# Real Example: Health Rating Index for Dublin
 
-```{r dublin_example}
-# Load Dublin health data
-data <- st_read("SA2022_Dublin_AllData.shp") %>%
-  filter(!is.na(HRI_gaus_n)) %>%
-  mutate(HRI_gaus_n = as.numeric(HRI_gaus_n)) %>%
-  filter(complete.cases(HRI_gaus_n, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
-  filter(st_is_valid(.))
+## Full Project
 
-# Prepare data
-st_geometry(data) <- st_jitter(st_geometry(data), amount = 0.00001)
-data <- st_transform(data, 3857)
-
-# Calculate block range for Dublin (~20km)
-bbox <- st_bbox(data)
-block_range <- min(bbox["xmax"] - bbox["xmin"], 
-                   bbox["ymax"] - bbox["ymin"]) / 3
-
-# Run analysis
-results <- SArf(
-  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
-  data = data,
-  k_neighbors = 10,
-  n_folds = 3,
-  n_bootstrap = 5,
-  num_trees = 250,
-  block_range = block_range,
-  verbose = TRUE
-)
-
-# View results
-print(results)
-results$model_comparison
-results$importance_plot
-results$ale_plots
-```
+For the complete analysis and reproducible code:
+- **GitHub:** https://github.com/kcredit/health-rating-index
+- **Publication:** Credit et al. (2025), GISRUK Conference Proceedings
+- **DOI:** 10.5281/zenodo.15183740
 
 # Interpretation Guide
 
@@ -312,7 +285,7 @@ results$ale_plots
 
 ```
 Credit, K. (2025). SArf: Spatial Autoregressive 
-Random Forest. https://github.com/kcredit/SArf
+Random Forest. https://github.com/YOUR-USERNAME/SArf
 
 Credit, K., Kumar, D., & Eccles, E. (2025). Exploring the 
 transport-health-environment nexus through a new 'Health Rating Index'. 

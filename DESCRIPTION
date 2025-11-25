@@ -3,9 +3,7 @@ Type: Package
 Title: Spatial Autoregressive Random Forest with Uncertainty Quantification
 Version: 0.1.0
 Authors@R: c(
-    person("Kevin", "Credit", email = "kevin.credit@example.com", role = c("aut", "cre")),
-    person("Kaur", "Damanpreet", role = "aut"),
-    person("Emma", "Eccles", role = "aut"))
+    person("Kevin", "Credit", email = "kevin.credit@example.com", role = c("aut", "cre"))
 Description: Implements spatial autoregressive random forest models with proper 
     uncertainty quantification through spatial cross-validation bootstrap. Provides
     comprehensive comparison to traditional spatial econometric models (SAR, SEM, SAC),
