@@ -209,8 +209,8 @@ write.csv(results$variable_importance, "output/variable_importance.csv", row.nam
 write.csv(results$ale_results, "output/ale_data.csv", row.names = FALSE)
 
 # Save map
-library(htmlwidgets)
-saveWidget(results$leaflet_map, "output/results_map.html")
+# library(htmlwidgets)
+# saveWidget(results$leaflet_map, "output/results_map.html")
 
 cat("All outputs saved to output/ directory\n")
 ```
