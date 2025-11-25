@@ -106,6 +106,19 @@ And if applicable, the methodological paper:
 
 MIT License - see [LICENSE](LICENSE) file.
 
+## Troubleshooting
+
+**ggplot2 conflict?** If you see errors about "Incompatible methods" or "non-numeric argument to binary operator":
+
+```r
+# Restart R, then load in this order:
+library(sf)
+library(dplyr)
+library(SArf)
+```
+
+See [TROUBLESHOOTING_GGPLOT2.md](../TROUBLESHOOTING_GGPLOT2.md) for detailed solutions.
+
 ## Contact
 
 Kevin Credit - kevin.credit@mu.ie - Maynooth University

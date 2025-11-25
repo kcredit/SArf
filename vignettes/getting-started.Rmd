@@ -5,8 +5,11 @@ date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Getting Started with SArf}
-  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include = FALSE}
@@ -19,7 +22,8 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-This vignette demonstrates how to use the SArf package for spatial autoregressive random forest analysis from start to finish.
+This vignette demonstrates how to use the SArf package for spatial
+autoregressive random forest analysis from start to finish.
 
 # Installation
 
@@ -61,7 +65,10 @@ library(dplyr)
 
 This example uses the full dataset from the Health Rating Index project.
 
-**Project Background:** SArf was developed as part of research analyzing environmental health burdens and benefits across Dublin, Ireland. The full project is available at https://github.com/kcredit/health-rating-index
+**Project Background:** SArf was developed as part of research analyzing
+environmental health burdens and benefits across Dublin, Ireland. The
+full project is available at
+<https://github.com/kcredit/health-rating-index>
 
 ## Load Data
 
@@ -215,75 +222,63 @@ write.csv(results$ale_results, "output/ale_data.csv", row.names = FALSE)
 cat("All outputs saved to output/ directory\n")
 ```
 
-
 ## Full Project
 
-For the complete analysis and reproducible code:
-- **GitHub:** https://github.com/kcredit/health-rating-index
-- **Publication:** Credit et al. (2025), GISRUK Conference Proceedings
-- **DOI:** 10.5281/zenodo.15183740
+For the complete analysis and reproducible code: - **GitHub:**
+<https://github.com/kcredit/health-rating-index> - **Publication:**
+Credit et al. (2025), GISRUK Conference Proceedings - **DOI:**
+10.5281/zenodo.15183740
 
 # Interpretation Guide
 
 ## Model Comparison
 
-- **RMSE**: Lower is better
-- **R²**: Higher is better (0-1 scale)
-- **Moran's I**: Close to 0 indicates no spatial autocorrelation in residuals
-- **Typically**: RF > spatial models for R², spatial models remove autocorrelation
+-   **RMSE**: Lower is better
+-   **R²**: Higher is better (0-1 scale)
+-   **Moran's I**: Close to 0 indicates no spatial autocorrelation in
+    residuals
+-   **Typically**: RF \> spatial models for R², spatial models remove
+    autocorrelation
 
 ## Variable Importance
 
-- High mean = strong predictor
-- Narrow CI = consistent across folds
-- spatial_lag often important (neighborhood effects)
+-   High mean = strong predictor
+-   Narrow CI = consistent across folds
+-   spatial_lag often important (neighborhood effects)
 
 ## ALE Plots
 
-- Positive slope = positive effect
-- Negative slope = negative effect
-- Curves = non-linear relationships
-- Confidence bands = uncertainty
+-   Positive slope = positive effect
+-   Negative slope = negative effect
+-   Curves = non-linear relationships
+-   Confidence bands = uncertainty
 
 # Tips and Best Practices
 
-**Dataset Size:**
-- < 1000: Full parameters
-- 1000-3000: Moderate parameters
-- 3000: Sample or reduce parameters
+**Dataset Size:** - \< 1000: Full parameters - 1000-3000: Moderate
+parameters - 3000: Sample or reduce parameters
 
-**Block Range:**
-- Too small → "same area" error
-- Too large → empty folds
-- Start with min(width, height) / 3
+**Block Range:** - Too small → "same area" error - Too large → empty
+folds - Start with min(width, height) / 3
 
-**Performance:**
-- 500 obs: ~5 min
-- 1000 obs: ~10 min
-- 2000 obs: ~20 min
-- 3000 obs: ~45 min
+**Performance:** - 500 obs: \~5 min - 1000 obs: \~10 min - 2000 obs:
+\~20 min - 3000 obs: \~45 min
 
-**Avoid Conflicts:**
-- Only load: SArf, sf, dplyr
-- Don't load ranger, spdep, etc. directly
+**Avoid Conflicts:** - Only load: SArf, sf, dplyr - Don't load ranger,
+spdep, etc. directly
 
 # Troubleshooting
 
-**"All points from same area"**
-- Increase block_range
-- Reduce n_folds
+**"All points from same area"** - Increase block_range - Reduce n_folds
 
-**Moran's I shows NA**
-- Check for missing values
-- Ensure no duplicate coordinates
+**Moran's I shows NA** - Check for missing values - Ensure no duplicate
+coordinates
 
-**Very slow**
-- Sample to 2000-3000 rows
-- Reduce n_bootstrap to 3-5
+**Very slow** - Sample to 2000-3000 rows - Reduce n_bootstrap to 3-5
 
 # Citation
 
-```
+```         
 Credit, K. (2025). SArf: Spatial Autoregressive 
 Random Forest. https://github.com/YOUR-USERNAME/SArf
 
