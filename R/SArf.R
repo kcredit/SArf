@@ -375,17 +375,66 @@ summary.SArf <- function(object, ...) {
     cat("Access with: object$leaflet_map\n\n")
   }
   
-  cat("=== Accessing Spatial Models ===\n")
-  cat("OLS model: object$ols_model or summary(object$ols_model)\n")
+  cat("=== Spatial Econometric Models ===\n\n")
+  
+  # OLS Model
+  if (!is.null(object$ols_model)) {
+    cat(strrep("-", 78), "\n")
+    cat("OLS MODEL\n")
+    cat(strrep("-", 78), "\n")
+    print(summary(object$ols_model))
+    cat("\n")
+  }
+  
+  # SAR Model
   if (!is.null(object$sar_model)) {
-    cat("SAR model: object$sar_model or summary(object$sar_model)\n")
+    cat(strrep("-", 78), "\n")
+    cat("SAR (SPATIAL LAG) MODEL\n")
+    cat(strrep("-", 78), "\n")
+    print(summary(object$sar_model))
+    cat("\n")
   }
+  
+  # SEM Model
   if (!is.null(object$sem_model)) {
-    cat("SEM model: object$sem_model or summary(object$sem_model)\n")
+    cat(strrep("-", 78), "\n")
+    cat("SEM (SPATIAL ERROR) MODEL\n")
+    cat(strrep("-", 78), "\n")
+    print(summary(object$sem_model))
+    cat("\n")
   }
+  
+  # SAC Model
   if (!is.null(object$sac_model)) {
-    cat("SAC model: object$sac_model or summary(object$sac_model)\n")
+    cat(strrep("-", 78), "\n")
+    cat("SAC (SPATIAL LAG + ERROR) MODEL\n")
+    cat(strrep("-", 78), "\n")
+    print(summary(object$sac_model))
+    cat("\n")
   }
+  
+  cat("=== Quick Access ===\n")
+  cat("Individual models: summary(object$ols_model), summary(object$sar_model), etc.\n")
+  cat("Coefficients: coef(object$sar_model)\n")
+  cat("Spatial parameters: object$sar_model$rho, object$sem_model$lambda\n\n")
+  
+  invisible(object)
+}
+
+
+#' Print method with optional full model summaries
+#'
+#' Extended print showing all spatial econometric model results
+#'
+#' @param x An object of class 'SArf'
+#' @param models Logical: print full summaries of all spatial models? (default: FALSE)
+#' @param ... Additional arguments (not used)
+#'
+#' @export
+print.SArf.models <- function(x, models = TRUE, ...) {
+  # Call summary method which now shows everything
+  summary.SArf(x)
+  invisible(x)
 }
 
 
