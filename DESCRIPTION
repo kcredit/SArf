@@ -1,0 +1,39 @@
+Package: SArf
+Type: Package
+Title: Spatial Autoregressive Random Forest with Uncertainty Quantification
+Version: 0.1.0
+Authors@R: c(
+    person("Kevin", "Credit", email = "kevin.credit@example.com", role = c("aut", "cre")),
+    person("Kaur", "Damanpreet", role = "aut"),
+    person("Emma", "Eccles", role = "aut"))
+Description: Implements spatial autoregressive random forest models with proper 
+    uncertainty quantification through spatial cross-validation bootstrap. Provides
+    comprehensive comparison to traditional spatial econometric models (SAR, SEM, SAC),
+    variable importance with confidence intervals, ALE plots with confidence ribbons,
+    and spatial diagnostics including Moran's I tests and visualization.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 4.0.0)
+Imports:
+    ranger (>= 0.13.0),
+    sf (>= 1.0.0),
+    spdep (>= 1.2.0),
+    spatialreg (>= 1.2.0),
+    blockCV (>= 3.0.0),
+    ALEPlot (>= 1.1),
+    ggplot2 (>= 3.3.0),
+    dplyr (>= 1.0.0),
+    tidyr (>= 1.1.0),
+    leaflet (>= 2.1.0),
+    stats,
+    methods
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+RoxygenNote: 7.2.0
+VignetteBuilder: knitr
+URL: https://github.com/kcredit/SArf
+BugReports: https://github.com/kcredit/SArf/issues
