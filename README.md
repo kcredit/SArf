@@ -48,6 +48,11 @@ results$importance_plot
 results$ale_plots
 results$leaflet_map
 
+# View FULL spatial model results (coefficients, p-values, etc.)
+show_models(results)           # All models
+show_models(results, "sar")    # Just SAR model
+summary(results$sar_model)     # Alternative way
+
 # Save outputs
 dir.create("output", showWarnings = FALSE)
 ggsave("output/importance_plot.png", results$importance_plot)

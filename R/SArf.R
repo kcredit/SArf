@@ -489,3 +489,64 @@ plot.SArf <- function(x, which = "all", ...) {
     stop("Invalid 'which' argument. Choose from: 'all', 'moran', 'importance', 'ale', 'comparison'")
   }
 }
+
+
+#' Display full results for spatial econometric models
+#'
+#' Helper function to easily view complete model summaries with p-values,
+#' standard errors, spatial parameters, and diagnostic tests.
+#'
+#' @param x An object of class 'SArf'
+#' @param model Character: which model to display? Options: "ols", "sar", "sem", 
+#'   "sac", or "all" (default: "all")
+#'
+#' @return Invisibly returns the SArf object. Prints model summaries to console.
+#'
+#' @examples
+#' \dontrun{
+#' results <- SArf(outcome ~ x1 + x2, data = mydata)
+#' 
+#' # Show all spatial models
+#' show_models(results)
+#' 
+#' # Show just SAR model
+#' show_models(results, "sar")
+#' 
+#' # Show SEM model
+#' show_models(results, "sem")
+#' }
+#'
+#' @export
+show_models <- function(x, model = "all") {
+  if (!inherits(x, "SArf")) {
+    stop("x must be a SArf object")
+  }
+  
+  models_to_show <- if (tolower(model) == "all") {
+    c("ols", "sar", "sem", "sac")
+  } else {
+    tolower(model)
+  }
+  
+  for (m in models_to_show) {
+    model_obj <- switch(m,
+                        "ols" = x$ols_model,
+                        "sar" = x$sar_model,
+                        "sem" = x$sem_model,
+                        "sac" = x$sac_model,
+                        NULL)
+    
+    if (!is.null(model_obj)) {
+      cat("\n")
+      cat(strrep("=", 78), "\n")
+      cat(toupper(m), "MODEL - FULL RESULTS\n")
+      cat(strrep("=", 78), "\n\n")
+      print(summary(model_obj))
+      cat("\n")
+    } else if (m %in% c("ols", "sar", "sem", "sac")) {
+      cat("\n", toupper(m), "model not available\n")
+    }
+  }
+  
+  invisible(x)
+}
