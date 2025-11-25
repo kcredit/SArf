@@ -41,7 +41,7 @@ install.packages(c(
 ))
 
 # Install SArf from GitHub
-devtools::install_github("kcredit/SArf")
+devtools::install_github("kcredit/SArf", force = TRUE)
 
 # Or from local directory
 # setwd("~/path/to/SArf")
@@ -54,9 +54,9 @@ devtools::install_github("kcredit/SArf")
 # Load Libraries
 
 ```{r libraries}
-library(SArf)
 library(sf)
 library(dplyr)
+library(SArf)
 
 # Note: Only load these three to avoid conflicts!
 ```
@@ -170,7 +170,7 @@ min_dimension <- min(width, height)/3
 results <- SArf(
   HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
-  k_neighbors = 10,            # Number of neighbors for spatial weights
+  k_neighbors = 8,             # Number of neighbors for spatial weights
   n_folds = n_folds,           # Spatial CV folds
   n_bootstrap = n_bootstrap,   # Bootstrap iterations
   num_trees = num_trees,       # Trees in random forest
@@ -183,8 +183,8 @@ results <- SArf(
 ## View Results
 
 ```{r view_dublin_results}
-# Print summary
-print(results)
+# Print all results (not recommended)
+# print(results)
 
 # Model comparison
 results$model_comparison
@@ -194,6 +194,9 @@ results$importance_plot
 
 # ALE plots
 results$ale_plots
+
+# Full sptial econometric model results
+show_models(results)
 
 # Interactive map
 results$leaflet_map
