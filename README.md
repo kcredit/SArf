@@ -19,7 +19,7 @@ SArf implements a **Spatial Autoregressive Random Forest** methodology that trea
 ```r
 # Install from GitHub
 # install.packages("devtools")
-devtools::install_github("YOUR-USERNAME/SArf")
+devtools::install_github("kcredit/SArf")
 ```
 
 ## Quick Start
