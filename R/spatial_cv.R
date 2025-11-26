@@ -228,6 +228,11 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         as.data.frame(data)
       }
       
+      # Create spatial_lag vector in correct order
+      spatial_lag_full <- numeric(nrow(data))
+      spatial_lag_full[train_idx] <- train_df$spatial_lag
+      spatial_lag_full[test_idx] <- test_df$spatial_lag
+      
       # Store results
       all_predictions[[result_counter]] <- data.frame(
         cv_iter = result_counter,
@@ -236,7 +241,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         row_id = 1:nrow(data),
         prediction = full_predictions,
         observed = full_df[[response_var]],
-        spatial_lag = c(train_df$spatial_lag, test_df$spatial_lag)[order(c(train_idx, test_idx))],
+        spatial_lag = spatial_lag_full,
         in_training = 1:nrow(data) %in% train_idx
       )
       
