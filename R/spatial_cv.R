@@ -236,6 +236,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         row_id = 1:nrow(data),
         prediction = full_predictions,
         observed = full_df[[response_var]],
+        spatial_lag = c(train_df$spatial_lag, test_df$spatial_lag)[order(c(train_idx, test_idx))],
         in_training = 1:nrow(data) %in% train_idx
       )
       
