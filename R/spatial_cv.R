@@ -126,6 +126,9 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
   all_models <- vector("list", total_models)
   result_counter <- 1
   
+  # Get all coordinates once (for efficiency)
+  all_coords <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(data)))
+  
   # Run spatial CV bootstrap
   if (verbose) cat("  Running spatial CV bootstrap...\n")
   
@@ -142,6 +145,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
       
       # Subset data
       train_data <- data[train_idx, ]
+      test_data <- data[test_idx, ]
       
       # Calculate spatial lag WITHIN training fold
       train_coords <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(train_data)))
@@ -155,7 +159,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         as.data.frame(train_data)
       }
       
-      # Add spatial lag
+      # Add spatial lag for TRAINING set (uses training neighbors & training y)
       train_df$spatial_lag <- spdep::lag.listw(
         train_lw, 
         train_df[[response_var]], 
@@ -165,7 +169,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
       # Update formula
       formula_with_lag <- update(formula, ~ . + spatial_lag)
       
-      # Fit RF
+      # Fit RF on training data
       rf_model <- ranger::ranger(
         formula = formula_with_lag,
         data = train_df,
@@ -173,31 +177,64 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         mtry = mtry,
         importance = "permutation",
         seed = seed + iter * 10 + fold,
-        verbose = FALSE  # Suppress ranger output
+        verbose = FALSE
       )
       
-      # Predict on FULL dataset
+      # CRITICAL FIX: Calculate spatial lag for TEST set using ONLY training neighbors
+      test_coords <- all_coords[test_idx, , drop = FALSE]
+      test_df <- if (inherits(test_data, "sf")) {
+        sf::st_drop_geometry(test_data)
+      } else {
+        as.data.frame(test_data)
+      }
+      
+      # For each test observation, find k nearest neighbors in TRAINING set
+      # and calculate spatial lag using ONLY training y values
+      test_df$spatial_lag <- numeric(nrow(test_df))
+      
+      for (i in 1:nrow(test_coords)) {
+        # Calculate distances from this test point to all training points
+        dists <- sqrt(rowSums((t(train_coords) - test_coords[i, ])^2))
+        
+        # Find k nearest training neighbors
+        k_neighbors <- min(20, length(dists))
+        nearest_train_indices <- order(dists)[1:k_neighbors]
+        
+        # Calculate weighted mean (spatial lag) from training neighbors only
+        weights <- 1 / (dists[nearest_train_indices] + 1e-10)  # Inverse distance weights
+        weights <- weights / sum(weights)  # Normalize
+        
+        test_df$spatial_lag[i] <- sum(
+          train_df[[response_var]][nearest_train_indices] * weights
+        )
+      }
+      
+      # Predict on TEST set with properly calculated spatial lag
+      test_predictions <- predict(rf_model, data = test_df)$predictions
+      
+      # Also calculate spatial lag for TRAINING set for in-sample predictions
+      # (this is already done above, so we can predict on training too)
+      train_predictions <- predict(rf_model, data = train_df)$predictions
+      
+      # Combine predictions for full dataset
+      full_predictions <- numeric(nrow(data))
+      full_predictions[train_idx] <- train_predictions
+      full_predictions[test_idx] <- test_predictions
+      
+      # Get observed values
       full_df <- if (inherits(data, "sf")) {
         sf::st_drop_geometry(data)
       } else {
         as.data.frame(data)
       }
       
-      full_df$spatial_lag <- spdep::lag.listw(
-        spatial_weights,
-        full_df[[response_var]],
-        zero.policy = TRUE
-      )
-      
-      predictions <- predict(rf_model, full_df)$predictions
-      
-      # Store results (more memory efficient)
+      # Store results
       all_predictions[[result_counter]] <- data.frame(
         cv_iter = result_counter,
         fold = fold,
         iteration = iter,
         row_id = 1:nrow(data),
-        prediction = predictions,
+        prediction = full_predictions,
         observed = full_df[[response_var]],
         in_training = 1:nrow(data) %in% train_idx
       )
@@ -258,6 +295,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
       r2 = r2,
       morans_i = moran_resid$estimate[1],
       morans_p = moran_resid$p.value
-    )
+    ),
+    folds = sb  # Return fold structure for transparency
   ))
 }
