@@ -14,18 +14,36 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
                              importance_table = NULL, n_top_vars = 6, 
                              verbose = TRUE) {
   
+  # Get response variable name
+  response_var <- all.vars(formula)[1]
+  spatial_lag_name <- "spatial_lag"
+  
   # Get top variables from importance table if provided
   if (!is.null(importance_table)) {
-    # Use the pre-calculated importance rankings
-    top_vars <- importance_table %>%
+    # Separate spatial_lag from other variables
+    other_vars <- importance_table %>%
       dplyr::arrange(desc(mean)) %>%
-      dplyr::filter(variable != "spatial_lag") %>%  # Remove spatial lag
-      dplyr::pull(variable) %>%
-      head(n_top_vars)
+      dplyr::filter(variable != spatial_lag_name) %>%
+      dplyr::pull(variable)
+    
+    # Check if spatial_lag is in importance table
+    has_spatial_lag <- spatial_lag_name %in% importance_table$variable
+    
+    # Select top variables: ensure spatial lag is included if present
+    if (has_spatial_lag) {
+      # Take top (n_top_vars - 1) other variables plus spatial lag
+      top_vars <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+    } else {
+      # No spatial lag, just take top n_top_vars
+      top_vars <- head(other_vars, n_top_vars)
+    }
     
     if (verbose) {
       cat("  Using top", length(top_vars), "variables from importance ranking:\n")
       cat("   ", paste(top_vars, collapse = ", "), "\n")
+      if (has_spatial_lag) {
+        cat("  (Spatial lag of dependent variable included)\n")
+      }
     }
     
   } else {
@@ -46,9 +64,18 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
       dplyr::summarise(mean_imp = mean(importance, na.rm = TRUE), .groups = 'drop') %>%
       dplyr::arrange(desc(mean_imp))
     
-    top_vars <- head(importance_summary$variable, n_top_vars)
-    top_vars <- top_vars[top_vars != "spatial_lag"]  # Remove spatial lag
-    top_vars <- head(top_vars, 6)  # Ensure exactly 6
+    # Separate spatial lag
+    other_vars <- importance_summary %>%
+      dplyr::filter(variable != spatial_lag_name) %>%
+      dplyr::pull(variable)
+    
+    has_spatial_lag <- spatial_lag_name %in% importance_summary$variable
+    
+    if (has_spatial_lag) {
+      top_vars <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+    } else {
+      top_vars <- head(other_vars, n_top_vars)
+    }
     
     if (verbose) {
       cat("  Calculating ALE for top", length(top_vars), "variables:\n")
@@ -63,12 +90,14 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
     as.data.frame(data)
   }
   
-  response_var <- all.vars(formula)[1]
-  model_data$spatial_lag <- spdep::lag.listw(
-    spatial_weights,
-    model_data[[response_var]],
-    zero.policy = TRUE
-  )
+  # Ensure spatial lag is in the data
+  if (!spatial_lag_name %in% names(model_data)) {
+    model_data$spatial_lag <- spdep::lag.listw(
+      spatial_weights,
+      model_data[[response_var]],
+      zero.policy = TRUE
+    )
+  }
   
   # Calculate ALE for each variable across all bootstrap models
   ale_results <- list()
@@ -82,26 +111,31 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
       model_obj <- cv_results$models[[i]]
       
       tryCatch({
-        # Calculate ALE using ALEPlot package
-        ale_obj <- ALEPlot::ALEPlot(
-          X = model_obj$train_data,
-          X.model = model_obj$model,
-          pred.fun = function(X.model, newdata) {
-            predict(X.model, newdata)$predictions
-          },
-          J = which(names(model_obj$train_data) == var),
-          K = 50
-        )
-        
-        var_ales[[i]] <- data.frame(
-          variable = var,
-          iteration = i,
-          x = ale_obj$x.values,
-          ale = ale_obj$f.values,
-          stringsAsFactors = FALSE
-        )
+        # Check that variable exists in training data
+        if (var %in% names(model_obj$train_data)) {
+          # Calculate ALE using ALEPlot package
+          ale_obj <- ALEPlot::ALEPlot(
+            X = model_obj$train_data,
+            X.model = model_obj$model,
+            pred.fun = function(X.model, newdata) {
+              predict(X.model, newdata)$predictions
+            },
+            J = which(names(model_obj$train_data) == var),
+            K = 50
+          )
+          
+          var_ales[[i]] <- data.frame(
+            variable = var,
+            iteration = i,
+            x = ale_obj$x.values,
+            ale = ale_obj$f.values,
+            stringsAsFactors = FALSE
+          )
+        }
       }, error = function(e) {
-        # Skip if ALE calculation fails
+        if (verbose) {
+          cat("      Warning: ALE calculation failed for", var, "in iteration", i, "\n")
+        }
         NULL
       })
     }
@@ -135,6 +169,10 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
         dplyr::mutate(variable = var)
       
       ale_results[[var]] <- ale_summary
+    } else {
+      if (verbose) {
+        cat("      Warning: No valid ALE results for", var, "\n")
+      }
     }
   }
   
@@ -143,6 +181,15 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
   
   # Create combined ALE plot (3x2 grid)
   if (nrow(ale_data) > 0) {
+    # Create clean variable labels for facets
+    ale_data <- ale_data %>%
+      dplyr::mutate(
+        variable_label = dplyr::case_when(
+          variable == spatial_lag_name ~ paste0(response_var, " (Spatial Lag)"),
+          TRUE ~ variable
+        )
+      )
+    
     ale_plots <- ggplot2::ggplot(
       ale_data,
       ggplot2::aes(x = x_smooth, y = ale_mean)
@@ -154,7 +201,7 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
       ) +
       ggplot2::geom_line(color = "darkblue", linewidth = 1) +
       ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-      ggplot2::facet_wrap(~ variable, scales = "free", ncol = 3) +
+      ggplot2::facet_wrap(~ variable_label, scales = "free", ncol = 3) +
       ggplot2::labs(
         title = "Accumulated Local Effects with 95% Confidence Intervals",
         subtitle = "Based on Spatial Cross-Validation Bootstrap",
