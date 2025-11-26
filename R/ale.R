@@ -181,15 +181,6 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
   
   # Create combined ALE plot (3x2 grid)
   if (nrow(ale_data) > 0) {
-    # Create clean variable labels for facets
-    ale_data <- ale_data %>%
-      dplyr::mutate(
-        variable_label = dplyr::case_when(
-          variable == spatial_lag_name ~ paste0(response_var, " (Spatial Lag)"),
-          TRUE ~ variable
-        )
-      )
-    
     ale_plots <- ggplot2::ggplot(
       ale_data,
       ggplot2::aes(x = x_smooth, y = ale_mean)
@@ -201,7 +192,7 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
       ) +
       ggplot2::geom_line(color = "darkblue", linewidth = 1) +
       ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-      ggplot2::facet_wrap(~ variable_label, scales = "free", ncol = 3) +
+      ggplot2::facet_wrap(~ variable, scales = "free", ncol = 3) +
       ggplot2::labs(
         title = "Accumulated Local Effects with 95% Confidence Intervals",
         subtitle = "Based on Spatial Cross-Validation Bootstrap",
