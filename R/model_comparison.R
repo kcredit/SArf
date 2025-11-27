@@ -49,7 +49,21 @@ compare_spatial_models <- function(formula, data, spatial_weights,
   
   rf_rmse <- sqrt(mean((rf_summary$pred_mean - rf_summary$observed)^2, na.rm = TRUE))
   rf_r2 <- cor(rf_summary$pred_mean, rf_summary$observed, use = "complete.obs")^2
-  rf_residuals <- rf_summary$pred_mean - rf_summary$observed
+  
+  # Create FULL residuals vector for Moran's I (aligned with spatial_weights)
+  # Use average prediction across all folds for each observation
+  rf_full_predictions <- rf_predictions %>%
+    dplyr::filter(in_training == FALSE) %>%
+    dplyr::group_by(row_id) %>%
+    dplyr::summarise(pred_mean = mean(prediction, na.rm = TRUE),
+                    observed = dplyr::first(observed),
+                    .groups = 'drop') %>%
+    dplyr::arrange(row_id)  # Ensure order matches data
+  
+  # Create vector of residuals in correct order for ALL observations
+  rf_residuals_full <- numeric(n_obs)
+  rf_residuals_full[rf_full_predictions$row_id] <- 
+    rf_full_predictions$pred_mean - rf_full_predictions$observed
   
   # Initialize results
   results <- list()
@@ -330,11 +344,26 @@ compare_spatial_models <- function(formula, data, spatial_weights,
   # Add RF Spatial CV results
   # ========================================
   rf_moran <- tryCatch({
-    moran_test <- spdep::moran.test(rf_residuals, spatial_weights, zero.policy = TRUE)
-    c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+    # Only calculate Moran's I on positions that have predictions (non-zero residuals)
+    # This is the OUT-OF-SAMPLE test set
+    non_zero_idx <- which(rf_residuals_full != 0)
+    
+    if (length(non_zero_idx) > 3) {  # Need at least a few observations
+      # Subset spatial weights to test observations only
+      test_coords <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(data)))[non_zero_idx, , drop = FALSE]
+      k_neighbors <- round(mean(sapply(spatial_weights$neighbours, length)))
+      test_nb <- spdep::knn2nb(spdep::knearneigh(test_coords, 
+                                                  k = min(k_neighbors, length(non_zero_idx) - 1)))
+      test_lw <- spdep::nb2listw(test_nb, style = "W", zero.policy = TRUE)
+      
+      moran_test <- spdep::moran.test(rf_residuals_full[non_zero_idx], test_lw, zero.policy = TRUE)
+      c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+    } else {
+      c(statistic = NA_real_, p_value = NA_real_)
+    }
   }, error = function(e) {
-    warning("Could not calculate Moran's I for RF residuals")
-    c(statistic = NA, p_value = NA)
+    if (verbose) warning("Could not calculate Moran's I for RF residuals: ", e$message)
+    c(statistic = NA_real_, p_value = NA_real_)
   })
   
   results$RF_Spatial_CV <- c(
