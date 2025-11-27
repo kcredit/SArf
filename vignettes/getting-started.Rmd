@@ -80,10 +80,10 @@ data <- st_read(data_path)
 
 # Check the data
 cat("Dataset size:", nrow(data), "small areas\n")
-summary(data$HRI_gaus_n)
+summary(data$HRI_gaus_e)
 
 # Variables included:
-# - HRI_gaus_n: Health Rating Index (outcome)
+# - HRI_gaus_e: Health Rating Index (outcome)
 # - In22_ED: Deprivation index
 # - NoAuto_p: % households without car
 # - POPD: Population density
@@ -94,11 +94,11 @@ summary(data$HRI_gaus_n)
 # Clean the data
 data_clean <- data %>%
   # Remove missing outcome
-  filter(!is.na(HRI_gaus_n)) %>%
+  filter(!is.na(HRI_gaus_e)) %>%
   # Ensure numeric
-  mutate(your_outcome_variable = as.numeric(HRI_gaus_n)) %>%
+  mutate(your_outcome_variable = as.numeric(HRI_gaus_e)) %>%
   # Remove missing predictors (add all your predictor names)
-  filter(complete.cases(HRI_gaus_n, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
+  filter(complete.cases(HRI_gaus_e, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
   # Fix invalid geometries
   filter(st_is_valid(.))
 
@@ -169,7 +169,7 @@ min_dimension <- min(width, height)/3
 ```{r run_dublin}
 # Run SArf analysis
 results <- SArf(
-  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
+  HRI_gaus_e ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
   k_neighbors = 20,             # Number of neighbors for spatial weights
   n_folds = n_folds,           # Spatial CV folds

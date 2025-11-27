@@ -14,7 +14,7 @@ Full dataset from the **Health Rating Index for Dublin** project analyzing envir
 | Variable | Description |
 |----------|-------------|
 | `SA_PUB2022` | Small area identifier |
-| `HRI_gaus_n` | Health Rating Index (standardized, 0-1) - **OUTCOME** |
+| `HRI_gaus_e` | Health Rating Index (standardized, 0-1) - **OUTCOME** |
 | `In22_ED` | Deprivation index score |
 | `NoAuto_p` | Percentage of households without a car |
 | `POPD` | Population density (persons per km²) |
@@ -39,7 +39,7 @@ data <- st_read(data_path)
 
 # Run SArf analysis
 results <- SArf(
-  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
+  HRI_gaus_e ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
   k_neighbors = 10,
   n_folds = 3,

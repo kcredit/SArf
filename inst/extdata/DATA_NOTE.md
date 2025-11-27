@@ -32,12 +32,7 @@ data_path <- system.file("extdata", "model_data.shp", package = "SArf")
 data <- st_read(data_path)
 
 # Run analysis
-results <- SArf(
-  HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
-  data = data,
-  k_neighbors = 10,
-  n_folds = 3,
-  n_bootstrap = 5
+...
 )
 
 # Save outputs
