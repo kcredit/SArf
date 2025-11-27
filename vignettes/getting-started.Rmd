@@ -31,22 +31,23 @@ autoregressive random forest analysis from start to finish.
 
 ```{r install}
 # Install development tools
-install.packages("devtools")
-install.packages("roxygen2")
+# install.packages("devtools")
+# install.packages("roxygen2")
 
 # Install SArf dependencies
-install.packages(c(
-  "ranger", "sf", "spdep", "spatialreg", "blockCV", "ALEPlot",
-  "ggplot2", "dplyr", "tidyr", "leaflet", "htmltools"
-))
+# install.packages(c(
+#   "ranger", "sf", "spdep", "spatialreg", "blockCV", "ALEPlot",
+#   "ggplot2", "dplyr", "tidyr", "leaflet", "htmltools"
+# ))
 
 # Install SArf from GitHub
 devtools::install_github("kcredit/SArf", force = TRUE)
 
 # Or from local directory
-# setwd("~/path/to/SArf")
-# devtools::document()
-# devtools::install()
+# Set working directory to your package
+setwd("~/Dropbox/Packages/SArf/SArf/")
+devtools::document()
+devtools::install()
 
 # IMPORTANT: Restart R session after installation!
 ```
@@ -86,9 +87,9 @@ summary(data$HRI_gaus_n)
 # - In22_ED: Deprivation index
 # - NoAuto_p: % households without car
 # - POPD: Population density
-# - log_dist: Log distance to city center
+# - log_dist: Log distance to nearest primary or secondary road
 # - ov60: % over 60 years old
-# - nonIrish: % non-Irish nationals
+# - nonIrish: % non-Irish citizens
 
 # Clean the data
 data_clean <- data %>%
@@ -170,7 +171,7 @@ min_dimension <- min(width, height)/3
 results <- SArf(
   HRI_gaus_n ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
   data = data,
-  k_neighbors = 8,             # Number of neighbors for spatial weights
+  k_neighbors = 20,             # Number of neighbors for spatial weights
   n_folds = n_folds,           # Spatial CV folds
   n_bootstrap = n_bootstrap,   # Bootstrap iterations
   num_trees = num_trees,       # Trees in random forest
@@ -185,9 +186,6 @@ results <- SArf(
 ## View Results
 
 ```{r view_dublin_results}
-# Print all results (not recommended)
-# print(results)
-
 # Model comparison
 results$model_comparison
 
