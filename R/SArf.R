@@ -21,18 +21,20 @@
 #' @param verbose Logical: print progress messages? (default: TRUE)
 #'
 #' @return A list of class 'SArf' containing:
-#' \item{moran_test}{Moran's I test results for dependent variable}
-#' \item{moran_plot}{ggplot object of Moran's I scatter plot}
-#' \item{spatial_cv_results}{Spatial CV predictions and metrics}
-#' \item{model_comparison}{Comparison table of RF vs spatial econometric models}
-#' \item{variable_importance}{Variable importance with 95% confidence intervals}
-#' \item{importance_plot}{ggplot object of variable importance}
-#' \item{ale_results}{ALE results for top predictors with confidence intervals}
-#' \item{ale_plots}{Combined ggplot object of ALE plots}
-#' \item{leaflet_map}{Interactive leaflet map (if create_map = TRUE)}
-#' \item{data}{Original data with predictions and spatial lag}
-#' \item{formula}{Model formula used}
-#' \item{spatial_weights}{Spatial weights matrix}
+#' \itemize{
+#'   \item moran_test: Moran's I test results for dependent variable
+#'   \item moran_plot: ggplot object of Moran's I scatter plot
+#'   \item spatial_cv_results: Spatial CV predictions and metrics
+#'   \item model_comparison: Comparison table of RF vs spatial econometric models
+#'   \item variable_importance: Variable importance with 95\% confidence intervals
+#'   \item importance_plot: ggplot object of variable importance
+#'   \item ale_results: ALE results for top predictors with confidence intervals
+#'   \item ale_plots: Combined ggplot object of ALE plots
+#'   \item leaflet_map: Interactive leaflet map (if create_map = TRUE)
+#'   \item data: Original data with predictions and spatial lag
+#'   \item formula: Model formula used
+#'   \item spatial_weights: Spatial weights matrix
+#' }
 #'
 #' @details
 #' This function implements a comprehensive spatial autoregressive random forest workflow:

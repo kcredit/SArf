@@ -174,6 +174,8 @@ results <- SArf(
   n_folds = n_folds,           # Spatial CV folds
   n_bootstrap = n_bootstrap,   # Bootstrap iterations
   num_trees = num_trees,       # Trees in random forest
+  include_naive_rf = TRUE,     # For comparison with "naive" random forest
+  naive_test_fraction = 0.2,   
   create_map = TRUE,           # Spatial folds map
   block_range = min_dimension, # Size of the spatial blocks in units of metres
   verbose = TRUE               # Print progress
@@ -223,6 +225,179 @@ write.csv(results$ale_results, "output/ale_data.csv", row.names = FALSE)
 # saveWidget(results$leaflet_map, "output/results_map.html")
 
 cat("All outputs saved to output/ directory\n")
+```
+
+## Verify Results
+
+```{r verify_results}
+# =================================================================
+# VERIFICATION CODE TO ENSURE SPATIAL LAGS ARE CALCULATED CORRECTLY
+# =================================================================
+
+# Extract spatial_weights from results
+spatial_weights <- results$spatial_weights
+
+# ========================================
+# 1. Get fold structure for verification
+# ========================================
+fold_1 <- results$spatial_cv_results$predictions %>%
+  filter(fold == 1, iteration == 1)
+
+test_idx <- fold_1 %>% filter(in_training == FALSE) %>% pull(row_id)
+train_idx <- fold_1 %>% filter(in_training == TRUE) %>% pull(row_id)
+
+cat("Fold 1, Iteration 1:\n")
+cat("Training observations:", length(train_idx), "\n")
+cat("Test observations:", length(test_idx), "\n\n")
+
+# ========================================
+# 2. Get coordinates and extract k
+# ========================================
+all_coords <- st_coordinates(st_centroid(st_geometry(data)))
+train_coords <- all_coords[train_idx, , drop = FALSE]
+
+# Extract k from spatial_weights
+k_neighbors <- round(mean(sapply(spatial_weights$neighbours, length)))
+cat("k (number of neighbors):", k_neighbors, "\n\n")
+
+# ========================================
+# 3. For EACH test observation, verify neighbors are ALL from training set
+# ========================================
+cat("=== Verifying Spatial Lag Calculation ===\n\n")
+
+# Get response variable name from results
+response_var <- all.vars(results$formula)[1]
+
+verification_results <- data.frame(
+  test_obs = test_idx,
+  stored_lag = numeric(length(test_idx)),
+  calculated_lag = numeric(length(test_idx)),
+  match = logical(length(test_idx)),
+  n_neighbors = numeric(length(test_idx)),
+  any_from_test = logical(length(test_idx))
+)
+
+for (i in 1:length(test_idx)) {
+  obs <- test_idx[i]
+  
+  # Get stored spatial lag from predictions
+  stored_lag <- fold_1 %>% filter(row_id == obs) %>% pull(spatial_lag)
+  
+  # Calculate what spatial lag SHOULD be (using training neighbors only)
+  obs_coord <- all_coords[obs, , drop = FALSE]
+  
+  # Find distances to ALL training observations
+  dists <- sqrt(rowSums(sweep(train_coords, 2, obs_coord, "-")^2))
+  
+  # Find k nearest TRAINING neighbors
+  k_to_use <- min(k_neighbors, length(dists))
+  nearest_indices <- order(dists)[1:k_to_use]
+  neighbor_rows <- train_idx[nearest_indices]
+  
+  # Calculate spatial lag with W-style weights (simple mean)
+  calculated_lag <- mean(data[[response_var]][neighbor_rows])
+  
+  # Check if any neighbors are from test set (should be NONE!)
+  any_from_test <- any(neighbor_rows %in% test_idx)
+  
+  # Store results
+  verification_results$stored_lag[i] <- stored_lag
+  verification_results$calculated_lag[i] <- calculated_lag
+  verification_results$match[i] <- abs(stored_lag - calculated_lag) < 0.001
+  verification_results$n_neighbors[i] <- k_to_use
+  verification_results$any_from_test[i] <- any_from_test
+}
+
+# ========================================
+# 4. Summary Statistics
+# ========================================
+cat("=== VERIFICATION RESULTS ===\n\n")
+
+cat("Total test observations checked:", nrow(verification_results), "\n")
+cat("Stored values match calculated:", sum(verification_results$match), "/", nrow(verification_results), "\n")
+cat("Observations with neighbors from test set:", sum(verification_results$any_from_test), "\n\n")
+
+if (sum(verification_results$any_from_test) > 0) {
+  cat("❌ PROBLEM: Some test observations have neighbors from test set!\n")
+  cat("This indicates data leakage.\n\n")
+  
+  # Show which observations have test neighbors
+  problem_obs <- verification_results %>% filter(any_from_test == TRUE)
+  cat("Problem observations:\n")
+  print(problem_obs %>% select(test_obs, any_from_test))
+  
+} else {
+  cat("✅ SUCCESS: NO test observations have neighbors from test set!\n")
+  cat("All spatial lags use only training neighbors.\n\n")
+}
+
+if (all(verification_results$match)) {
+  cat("✅ SUCCESS: All stored spatial_lag values match manual calculations!\n")
+  cat("The order() bug is fixed.\n\n")
+} else {
+  cat("❌ PROBLEM: Some stored values don't match calculations!\n")
+  cat("Number of mismatches:", sum(!verification_results$match), "\n\n")
+  
+  # Show mismatches
+  mismatches <- verification_results %>% filter(match == FALSE)
+  cat("Mismatched observations (first 10):\n")
+  print(head(mismatches %>% select(test_obs, stored_lag, calculated_lag), 10))
+}
+
+# ========================================
+# 5. Detailed Check for Random Sample
+# ========================================
+cat("\n=== DETAILED CHECK: 5 Random Test Observations ===\n\n")
+
+sample_obs <- sample(test_idx, min(5, length(test_idx)))
+
+for (obs in sample_obs) {
+  cat("Observation:", obs, "\n")
+  
+  # Get stored value
+  stored <- fold_1 %>% filter(row_id == obs) %>% pull(spatial_lag)
+  
+  # Calculate manually
+  obs_coord <- all_coords[obs, , drop = FALSE]
+  dists <- sqrt(rowSums(sweep(train_coords, 2, obs_coord, "-")^2))
+  k_to_use <- min(k_neighbors, length(dists))
+  nearest_indices <- order(dists)[1:k_to_use]
+  neighbor_rows <- train_idx[nearest_indices]
+  calculated <- mean(data[[response_var]][neighbor_rows])
+  
+  cat("  Stored spatial_lag:    ", round(stored, 6), "\n")
+  cat("  Calculated spatial_lag:", round(calculated, 6), "\n")
+  cat("  Match:                 ", abs(stored - calculated) < 0.001, "\n")
+  cat("  Number of neighbors:   ", k_to_use, "\n")
+  cat("  All from training set: ", all(neighbor_rows %in% train_idx), "\n")
+  cat("  Any from test set:     ", any(neighbor_rows %in% test_idx), "\n")
+  
+  # Show neighbor IDs
+  cat("  Neighbor row IDs:      ", paste(head(neighbor_rows, 10), collapse = ", "))
+  if (k_to_use > 10) cat(", ...")
+  cat("\n\n")
+}
+
+# ========================================
+# 6. Final Summary
+# ========================================
+cat("=== FINAL ASSESSMENT ===\n\n")
+
+if (sum(verification_results$any_from_test) == 0 && all(verification_results$match)) {
+  cat("✅✅✅ PERFECT! ✅✅✅\n")
+  cat("1. NO data leakage (all neighbors from training set)\n")
+  cat("2. Storage is correct (stored values match calculations)\n")
+  cat("3. Your spatial CV implementation is working correctly!\n")
+} else {
+  if (sum(verification_results$any_from_test) > 0) {
+    cat("❌ Data leakage detected\n")
+  }
+  if (!all(verification_results$match)) {
+    cat("❌ Storage bug detected\n")
+  }
+  cat("\nSee details above for specific issues.\n")
+}
+
 ```
 
 ## Full Project

@@ -148,7 +148,7 @@ compare_spatial_models <- function(formula, data, spatial_weights,
         
         naive_moran <- tryCatch({
           moran_test <- spdep::moran.test(naive_residuals, test_lw, zero.policy = TRUE)
-          c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+          c(statistic = as.numeric(moran_test$estimate[1]), p_value = as.numeric(moran_test$p.value))
         }, error = function(e) {
           if (verbose) cat("\n    Warning: Could not calculate Moran's I for Naive RF:", e$message, "\n")
           c(statistic = NA_real_, p_value = NA_real_)
@@ -158,8 +158,8 @@ compare_spatial_models <- function(formula, data, spatial_weights,
       }
       
       results$Naive_RF <- c(naive_metrics,
-                           Morans_I = naive_moran["statistic"],
-                           Morans_pval = naive_moran["p_value"])
+                           Morans_I = unname(naive_moran["statistic"]),
+                           Morans_pval = unname(naive_moran["p_value"]))
       model_objects$Naive_RF <- naive_rf
       
       elapsed <- round(difftime(Sys.time(), start_time, units = "secs"), 1)
@@ -187,15 +187,16 @@ compare_spatial_models <- function(formula, data, spatial_weights,
     ols_resid <- residuals(ols_model)
     ols_moran <- tryCatch({
       moran_test <- spdep::moran.test(ols_resid, spatial_weights, zero.policy = TRUE)
-      c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+      c(statistic = as.numeric(moran_test$estimate[1]), 
+        p_value = as.numeric(moran_test$p.value))
     }, error = function(e) {
       if (verbose) cat("    Warning: Could not calculate Moran's I for OLS:", e$message, "\n")
       c(statistic = NA_real_, p_value = NA_real_)
     })
     
     results$OLS <- c(ols_metrics, 
-                     Morans_I = ols_moran["statistic"],
-                     Morans_pval = ols_moran["p_value"])
+                     Morans_I = unname(ols_moran["statistic"]),
+                     Morans_pval = unname(ols_moran["p_value"]))
     model_objects$OLS <- ols_model
     
     elapsed <- round(difftime(Sys.time(), start_time, units = "secs"), 1)
@@ -230,15 +231,15 @@ compare_spatial_models <- function(formula, data, spatial_weights,
       sar_resid <- residuals(sar_model)
       sar_moran <- tryCatch({
         moran_test <- spdep::moran.test(sar_resid, spatial_weights, zero.policy = TRUE)
-        c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+        c(statistic = as.numeric(moran_test$estimate[1]), p_value = as.numeric(moran_test$p.value))
       }, error = function(e) {
         warning("Could not calculate Moran's I for SAR residuals")
         c(statistic = NA, p_value = NA)
       })
       
       results$SAR <- c(sar_metrics,
-                      Morans_I = sar_moran["statistic"],
-                      Morans_pval = sar_moran["p_value"])
+                      Morans_I = unname(sar_moran["statistic"]),
+                      Morans_pval = unname(sar_moran["p_value"]))
       model_objects$SAR <- sar_model
       
       elapsed <- round(difftime(Sys.time(), start_time, units = "secs"), 1)
@@ -276,15 +277,15 @@ compare_spatial_models <- function(formula, data, spatial_weights,
       sem_resid <- residuals(sem_model)
       sem_moran <- tryCatch({
         moran_test <- spdep::moran.test(sem_resid, spatial_weights, zero.policy = TRUE)
-        c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+        c(statistic = as.numeric(moran_test$estimate[1]), p_value = as.numeric(moran_test$p.value))
       }, error = function(e) {
         warning("Could not calculate Moran's I for SEM residuals")
         c(statistic = NA, p_value = NA)
       })
       
       results$SEM <- c(sem_metrics,
-                      Morans_I = sem_moran["statistic"],
-                      Morans_pval = sem_moran["p_value"])
+                      Morans_I = unname(sem_moran["statistic"]),
+                      Morans_pval = unname(sem_moran["p_value"]))
       model_objects$SEM <- sem_model
       
       elapsed <- round(difftime(Sys.time(), start_time, units = "secs"), 1)
@@ -322,15 +323,15 @@ compare_spatial_models <- function(formula, data, spatial_weights,
       sac_resid <- residuals(sac_model)
       sac_moran <- tryCatch({
         moran_test <- spdep::moran.test(sac_resid, spatial_weights, zero.policy = TRUE)
-        c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
+        c(statistic = as.numeric(moran_test$estimate[1]), p_value = as.numeric(moran_test$p.value))
       }, error = function(e) {
         warning("Could not calculate Moran's I for SAC residuals")
         c(statistic = NA, p_value = NA)
       })
       
       results$SAC <- c(sac_metrics,
-                      Morans_I = sac_moran["statistic"],
-                      Morans_pval = sac_moran["p_value"])
+                      Morans_I = unname(sac_moran["statistic"]),
+                      Morans_pval = unname(sac_moran["p_value"]))
       model_objects$SAC <- sac_model
       
       elapsed <- round(difftime(Sys.time(), start_time, units = "secs"), 1)
@@ -343,39 +344,86 @@ compare_spatial_models <- function(formula, data, spatial_weights,
   # ========================================
   # Add RF Spatial CV results
   # ========================================
+  cat("  Attempting to calculate Moran's I for RF residuals...\n")
+  
   rf_moran <- tryCatch({
-    # Only calculate Moran's I on positions that have predictions (non-zero residuals)
-    # This is the OUT-OF-SAMPLE test set
-    non_zero_idx <- which(rf_residuals_full != 0)
+    # RF residuals are only for OUT-OF-SAMPLE observations
+    test_row_ids <- rf_full_predictions$row_id
     
-    if (length(non_zero_idx) > 3) {  # Need at least a few observations
-      # Subset spatial weights to test observations only
-      test_coords <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(data)))[non_zero_idx, , drop = FALSE]
-      k_neighbors <- round(mean(sapply(spatial_weights$neighbours, length)))
-      test_nb <- spdep::knn2nb(spdep::knearneigh(test_coords, 
-                                                  k = min(k_neighbors, length(non_zero_idx) - 1)))
-      test_lw <- spdep::nb2listw(test_nb, style = "W", zero.policy = TRUE)
-      
-      moran_test <- spdep::moran.test(rf_residuals_full[non_zero_idx], test_lw, zero.policy = TRUE)
-      c(statistic = moran_test$estimate[1], p_value = moran_test$p.value)
-    } else {
+    cat("    Number of test observations:", length(test_row_ids), "\n")
+    cat("    Test row IDs (first 10):", paste(head(test_row_ids, 10), collapse=", "), "\n")
+    
+    if (length(test_row_ids) < 4) {
+      cat("    ERROR: Too few test observations for Moran's I\n")
       c(statistic = NA_real_, p_value = NA_real_)
+    } else {
+      # Extract residuals for test observations
+      test_residuals <- rf_residuals_full[test_row_ids]
+      
+      cat("    Residuals - min:", min(test_residuals), "max:", max(test_residuals), "\n")
+      cat("    Number of non-zero residuals:", sum(test_residuals != 0), "\n")
+      
+      # Subset spatial_weights to test observations
+      cat("    Subsetting spatial weights...\n")
+      test_nb <- spatial_weights$neighbours[test_row_ids]
+      cat("    Original neighbors (first 3 obs):\n")
+      print(head(test_nb, 3))
+      
+      # Remap neighbor indices to subset
+      cat("    Remapping neighbor indices...\n")
+      test_nb_remapped <- lapply(test_nb, function(neighbors) {
+        # Keep only neighbors that are in test set
+        valid <- neighbors[neighbors %in% test_row_ids]
+        # Remap to positions in test_row_ids vector
+        match(valid, test_row_ids)
+      })
+      
+      # Remove any NULL entries
+      test_nb_remapped <- lapply(test_nb_remapped, function(x) x[!is.na(x)])
+      
+      cat("    Remapped neighbors (first 3 obs):\n")
+      print(head(test_nb_remapped, 3))
+      
+      # Create proper nb object
+      class(test_nb_remapped) <- "nb"
+      attr(test_nb_remapped, "region.id") <- as.character(1:length(test_nb_remapped))
+      
+      cat("    Creating spatial weights listw object...\n")
+      test_lw <- spdep::nb2listw(test_nb_remapped, style = "W", zero.policy = TRUE)
+      cat("    Spatial weights created successfully\n")
+      
+      cat("    Running Moran's I test...\n")
+      moran_test <- spdep::moran.test(test_residuals, test_lw, zero.policy = TRUE)
+      
+      cat("    SUCCESS: Moran's I =", moran_test$estimate[1], "\n")
+      c(statistic = as.numeric(moran_test$estimate[1]), p_value = as.numeric(moran_test$p.value))
     }
   }, error = function(e) {
-    if (verbose) warning("Could not calculate Moran's I for RF residuals: ", e$message)
+    cat("    ❌❌❌ ERROR calculating Moran's I for RF residuals ❌❌❌\n")
+    cat("    Error message:", e$message, "\n")
+    cat("    Call stack:\n")
+    print(sys.calls())
     c(statistic = NA_real_, p_value = NA_real_)
   })
   
   results$RF_Spatial_CV <- c(
     RMSE = rf_rmse,
     R2 = rf_r2,
-    Morans_I = rf_moran["statistic"],
-    Morans_pval = rf_moran["p_value"]
+    Morans_I = unname(rf_moran["statistic"]),
+    Morans_pval = unname(rf_moran["p_value"])
   )
   
   # ========================================
   # Create comparison table with proper ordering
   # ========================================
+  
+  # DEBUG: Print what's in results before creating table
+  cat("\n=== DEBUG: Results before table creation ===\n")
+  for (model_name in names(results)) {
+    cat("Model:", model_name, "\n")
+    cat("  Values:", paste(names(results[[model_name]]), "=", results[[model_name]], collapse=", "), "\n")
+  }
+  cat("===========================================\n\n")
   
   # Define desired order: Naive RF first, then other models, then RF Spatial CV last
   model_order <- c("Naive_RF", "OLS", "SAR", "SEM", "SAC", "RF_Spatial_CV")

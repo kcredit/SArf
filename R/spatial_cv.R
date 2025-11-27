@@ -197,7 +197,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
       
       for (i in 1:nrow(test_coords)) {
         # Calculate distances from this test point to all training points
-        dists <- sqrt(rowSums((t(train_coords) - test_coords[i, ])^2))
+        dists <- sqrt(rowSums(sweep(train_coords, 2, test_coords[i, ], "-")^2))
         
         # Find k nearest training neighbors (use same k as in spatial_weights)
         k_to_use <- min(k_neighbors, length(dists))
