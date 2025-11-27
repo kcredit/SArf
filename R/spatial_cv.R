@@ -38,6 +38,9 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
   response_var <- all.vars(formula)[1]
   predictor_vars <- all.vars(formula)[-1]
   
+  # Extract k (number of neighbors) from spatial_weights
+  k_neighbors <- round(mean(sapply(spatial_weights$neighbours, length)))
+  
   # Convert to non-spatial for blockCV
   if (inherits(data, "sf")) {
     data_spatial <- data
@@ -149,7 +152,7 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
       
       # Calculate spatial lag WITHIN training fold
       train_coords <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(train_data)))
-      train_nb <- spdep::knn2nb(spdep::knearneigh(train_coords, k = 20))
+      train_nb <- spdep::knn2nb(spdep::knearneigh(train_coords, k = k_neighbors))
       train_lw <- spdep::nb2listw(train_nb, style = "W", zero.policy = TRUE)
       
       # Get train data as data.frame
@@ -196,17 +199,13 @@ spatial_cv_rf <- function(formula, data, spatial_weights, n_folds = 5,
         # Calculate distances from this test point to all training points
         dists <- sqrt(rowSums((t(train_coords) - test_coords[i, ])^2))
         
-        # Find k nearest training neighbors
-        k_neighbors <- min(20, length(dists))
-        nearest_train_indices <- order(dists)[1:k_neighbors]
+        # Find k nearest training neighbors (use same k as in spatial_weights)
+        k_to_use <- min(k_neighbors, length(dists))
+        nearest_train_indices <- order(dists)[1:k_to_use]
         
-        # Calculate weighted mean (spatial lag) from training neighbors only
-        weights <- 1 / (dists[nearest_train_indices] + 1e-10)  # Inverse distance weights
-        weights <- weights / sum(weights)  # Normalize
-        
-        test_df$spatial_lag[i] <- sum(
-          train_df[[response_var]][nearest_train_indices] * weights
-        )
+        # Calculate spatial lag with W-style weights (simple mean)
+        # This matches the row-standardized weights used in training
+        test_df$spatial_lag[i] <- mean(train_df[[response_var]][nearest_train_indices])
       }
       
       # Predict on TEST set with properly calculated spatial lag
