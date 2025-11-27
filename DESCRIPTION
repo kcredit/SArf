@@ -31,7 +31,7 @@ Suggests:
     rmarkdown,
     testthat (>= 3.0.0),
     htmlwidgets
-RoxygenNote: 7.2.0
+RoxygenNote: 7.3.3
 VignetteBuilder: knitr
 URL: https://github.com/kcredit/SArf
 BugReports: https://github.com/kcredit/SArf/issues

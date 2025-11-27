@@ -14,6 +14,8 @@
 #' @param mtry Number of variables to split on at each node (default: NULL, auto-selected)
 #' @param alpha Significance level for Moran's I test (default: 0.05)
 #' @param compare_models Vector of models to compare: "OLS", "SAR", "SEM", "SAC" (default: all)
+#' @param include_naive_rf Logical: include naive RF with simple train-test split? (default: TRUE)
+#' @param naive_test_fraction Fraction of data for test set in naive RF (default: 0.2)
 #' @param create_map Logical: create leaflet map of dependent variable? (default: TRUE)
 #' @param seed Random seed for reproducibility (default: 1111)
 #' @param verbose Logical: print progress messages? (default: TRUE)
@@ -99,6 +101,8 @@ SArf <- function(formula,
                  mtry = NULL,
                  alpha = 0.05,
                  compare_models = c("OLS", "SAR", "SEM", "SAC"),
+                 include_naive_rf = TRUE,
+                 naive_test_fraction = 0.2,
                  create_map = TRUE,
                  seed = 1111,
                  verbose = TRUE) {
@@ -177,6 +181,11 @@ SArf <- function(formula,
     spatial_weights = spatial_weights,
     rf_predictions = cv_results$predictions,
     compare_models = compare_models,
+    include_naive_rf = include_naive_rf,
+    naive_test_fraction = naive_test_fraction,
+    num_trees = num_trees,
+    mtry = mtry,
+    seed = seed,
     verbose = verbose
   )
   
