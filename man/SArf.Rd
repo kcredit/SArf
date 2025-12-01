@@ -15,6 +15,7 @@ SArf(
   num_trees = 500,
   mtry = NULL,
   alpha = 0.05,
+  run_spatial_models = TRUE,
   compare_models = c("OLS", "SAR", "SEM", "SAC"),
   include_naive_rf = TRUE,
   naive_test_fraction = 0.2,
@@ -44,9 +45,14 @@ SArf(
 
 \item{alpha}{Significance level for Moran's I test (default: 0.05)}
 
-\item{compare_models}{Vector of models to compare: "OLS", "SAR", "SEM", "SAC" (default: all)}
+\item{run_spatial_models}{Logical: fit OLS, SAR, SEM, SAC models? (default: TRUE).
+Set to FALSE for faster execution when only spatial CV RF results are needed.}
 
-\item{include_naive_rf}{Logical: include naive RF with simple train-test split? (default: TRUE)}
+\item{compare_models}{Vector of models to compare: "OLS", "SAR", "SEM", "SAC" (default: all).
+Only used when run_spatial_models = TRUE.}
+
+\item{include_naive_rf}{Logical: include naive RF with simple train-test split? (default: TRUE).
+Only used when run_spatial_models = TRUE.}
 
 \item{naive_test_fraction}{Fraction of data for test set in naive RF (default: 0.2)}
 
@@ -62,7 +68,7 @@ A list of class 'SArf' containing:
   \item moran_test: Moran's I test results for dependent variable
   \item moran_plot: ggplot object of Moran's I scatter plot
   \item spatial_cv_results: Spatial CV predictions and metrics
-  \item model_comparison: Comparison table of RF vs spatial econometric models
+  \item model_comparison: Comparison table of RF vs spatial econometric models (NULL if run_spatial_models = FALSE)
   \item variable_importance: Variable importance with 95\% confidence intervals
   \item importance_plot: ggplot object of variable importance
   \item ale_results: ALE results for top predictors with confidence intervals
@@ -71,6 +77,7 @@ A list of class 'SArf' containing:
   \item data: Original data with predictions and spatial lag
   \item formula: Model formula used
   \item spatial_weights: Spatial weights matrix
+  \item ols_model, sar_model, sem_model, sac_model: Spatial econometric models (NULL if run_spatial_models = FALSE)
 }
 }
 \description{
@@ -88,8 +95,9 @@ This function implements a comprehensive spatial autoregressive random forest wo
    cross-validation with proper within-fold spatial lag calculation to prevent
    data leakage.
 
-3. **Model Comparison**: Compares random forest to traditional spatial econometric
+3. **Model Comparison** (optional): Compares random forest to traditional spatial econometric
    models (OLS, SAR, SEM, SAC) using RMSE, R², and Moran's I on residuals.
+   Set \code{run_spatial_models = FALSE} to skip this step for faster execution.
 
 4. **Uncertainty Quantification**: Bootstrap confidence intervals on variable
    importance through spatial CV iterations.
@@ -107,13 +115,23 @@ library(SArf)
 # Load spatial data
 data <- st_read("your_data.shp")
 
-# Run SArf analysis
+# Run full SArf analysis (default)
 results <- SArf(
   formula = outcome ~ predictor1 + predictor2 + predictor3,
   data = data,
   k_neighbors = 20,
   n_folds = 5,
   n_bootstrap = 20
+)
+
+# Fast mode: skip spatial econometric models
+results_fast <- SArf(
+  formula = outcome ~ predictor1 + predictor2 + predictor3,
+  data = data,
+  k_neighbors = 20,
+  n_folds = 5,
+  n_bootstrap = 20,
+  run_spatial_models = FALSE
 )
 
 # View results

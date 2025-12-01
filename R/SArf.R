@@ -13,8 +13,12 @@
 #' @param num_trees Number of trees in random forest (default: 500)
 #' @param mtry Number of variables to split on at each node (default: NULL, auto-selected)
 #' @param alpha Significance level for Moran's I test (default: 0.05)
-#' @param compare_models Vector of models to compare: "OLS", "SAR", "SEM", "SAC" (default: all)
-#' @param include_naive_rf Logical: include naive RF with simple train-test split? (default: TRUE)
+#' @param run_spatial_models Logical: fit OLS, SAR, SEM, SAC models? (default: TRUE).
+#'   Set to FALSE for faster execution when only spatial CV RF results are needed.
+#' @param compare_models Vector of models to compare: "OLS", "SAR", "SEM", "SAC" (default: all).
+#'   Only used when run_spatial_models = TRUE.
+#' @param include_naive_rf Logical: include naive RF with simple train-test split? (default: TRUE).
+#'   Only used when run_spatial_models = TRUE.
 #' @param naive_test_fraction Fraction of data for test set in naive RF (default: 0.2)
 #' @param create_map Logical: create leaflet map of dependent variable? (default: TRUE)
 #' @param seed Random seed for reproducibility (default: 1111)
@@ -25,7 +29,7 @@
 #'   \item moran_test: Moran's I test results for dependent variable
 #'   \item moran_plot: ggplot object of Moran's I scatter plot
 #'   \item spatial_cv_results: Spatial CV predictions and metrics
-#'   \item model_comparison: Comparison table of RF vs spatial econometric models
+#'   \item model_comparison: Comparison table of RF vs spatial econometric models (NULL if run_spatial_models = FALSE)
 #'   \item variable_importance: Variable importance with 95\% confidence intervals
 #'   \item importance_plot: ggplot object of variable importance
 #'   \item ale_results: ALE results for top predictors with confidence intervals
@@ -34,6 +38,7 @@
 #'   \item data: Original data with predictions and spatial lag
 #'   \item formula: Model formula used
 #'   \item spatial_weights: Spatial weights matrix
+#'   \item ols_model, sar_model, sem_model, sac_model: Spatial econometric models (NULL if run_spatial_models = FALSE)
 #' }
 #'
 #' @details
@@ -47,8 +52,9 @@
 #'    cross-validation with proper within-fold spatial lag calculation to prevent
 #'    data leakage.
 #'
-#' 3. **Model Comparison**: Compares random forest to traditional spatial econometric
+#' 3. **Model Comparison** (optional): Compares random forest to traditional spatial econometric
 #'    models (OLS, SAR, SEM, SAC) using RMSE, R², and Moran's I on residuals.
+#'    Set \code{run_spatial_models = FALSE} to skip this step for faster execution.
 #'
 #' 4. **Uncertainty Quantification**: Bootstrap confidence intervals on variable
 #'    importance through spatial CV iterations.
@@ -66,13 +72,23 @@
 #' # Load spatial data
 #' data <- st_read("your_data.shp")
 #'
-#' # Run SArf analysis
+#' # Run full SArf analysis (default)
 #' results <- SArf(
 #'   formula = outcome ~ predictor1 + predictor2 + predictor3,
 #'   data = data,
 #'   k_neighbors = 20,
 #'   n_folds = 5,
 #'   n_bootstrap = 20
+#' )
+#'
+#' # Fast mode: skip spatial econometric models
+#' results_fast <- SArf(
+#'   formula = outcome ~ predictor1 + predictor2 + predictor3,
+#'   data = data,
+#'   k_neighbors = 20,
+#'   n_folds = 5,
+#'   n_bootstrap = 20,
+#'   run_spatial_models = FALSE
 #' )
 #'
 #' # View results
@@ -102,6 +118,7 @@ SArf <- function(formula,
                  num_trees = 500,
                  mtry = NULL,
                  alpha = 0.05,
+                 run_spatial_models = TRUE,
                  compare_models = c("OLS", "SAR", "SEM", "SAC"),
                  include_naive_rf = TRUE,
                  naive_test_fraction = 0.2,
@@ -125,6 +142,9 @@ SArf <- function(formula,
   }
   
   if (verbose) cat("\n=== SPATIAL AUTOREGRESSIVE RANDOM FOREST ===\n")
+  if (verbose && !run_spatial_models) {
+    cat("  [Fast mode: skipping spatial econometric models]\n")
+  }
   
   # Extract formula components
   response_var <- all.vars(formula)[1]
@@ -175,37 +195,57 @@ SArf <- function(formula,
     verbose = verbose
   )
   
-  # Step 4: Compare to spatial econometric models
-  if (verbose) cat("\nStep 4: Comparing to spatial econometric models...\n")
-  model_comparison <- compare_spatial_models(
-    formula = formula,
-    data = data,
-    spatial_weights = spatial_weights,
-    rf_predictions = cv_results$predictions,
-    compare_models = compare_models,
-    include_naive_rf = include_naive_rf,
-    naive_test_fraction = naive_test_fraction,
-    num_trees = num_trees,
-    mtry = mtry,
-    seed = seed,
-    verbose = verbose
-  )
+  # Step 4: Compare to spatial econometric models (conditional)
+  model_comparison <- NULL
+  ols_model <- NULL
+  sar_model <- NULL
+  sem_model <- NULL
+  sac_model <- NULL
+  naive_rf_model <- NULL
+  
+  if (run_spatial_models) {
+    if (verbose) cat("\nStep 4: Comparing to spatial econometric models...\n")
+    model_comparison <- compare_spatial_models(
+      formula = formula,
+      data = data,
+      spatial_weights = spatial_weights,
+      rf_predictions = cv_results$predictions,
+      compare_models = compare_models,
+      include_naive_rf = include_naive_rf,
+      naive_test_fraction = naive_test_fraction,
+      num_trees = num_trees,
+      mtry = mtry,
+      seed = seed,
+      verbose = verbose
+    )
+    
+    # Extract individual models for easy access
+    ols_model <- model_comparison$models$OLS
+    sar_model <- model_comparison$models$SAR
+    sem_model <- model_comparison$models$SEM
+    sac_model <- model_comparison$models$SAC
+    naive_rf_model <- model_comparison$models$Naive_RF
+  } else {
+    if (verbose) cat("\nStep 4: Skipping spatial econometric models (run_spatial_models = FALSE)\n")
+  }
   
   # Step 5: Variable importance with bootstrap CIs
-  if (verbose) cat("\nStep 5: Calculating variable importance with confidence intervals...\n")
+  step_num <- if (run_spatial_models) 5 else 4
+  if (verbose) cat(paste0("\nStep ", step_num, ": Calculating variable importance with confidence intervals...\n"))
   importance_results <- calculate_importance_ci(
     cv_models = cv_results$models,
     verbose = verbose
   )
   
   # Step 6: ALE plots with bootstrap CIs
-  if (verbose) cat("\nStep 6: Generating ALE plots with confidence intervals...\n")
+  step_num <- step_num + 1
+  if (verbose) cat(paste0("\nStep ", step_num, ": Generating ALE plots with confidence intervals...\n"))
   ale_results <- calculate_ale_ci(
     data = data,
     formula = formula,
     cv_results = cv_results,
     spatial_weights = spatial_weights,
-    importance_table = importance_results$table,  # Pass importance results
+    importance_table = importance_results$table,
     n_top_vars = 6,
     verbose = verbose
   )
@@ -213,7 +253,8 @@ SArf <- function(formula,
   # Step 7: Create leaflet map
   leaflet_map <- NULL
   if (create_map) {
-    if (verbose) cat("\nStep 7: Creating interactive map...\n")
+    step_num <- step_num + 1
+    if (verbose) cat(paste0("\nStep ", step_num, ": Creating interactive map...\n"))
     leaflet_map <- tryCatch({
       create_leaflet_map(
         data = data,
@@ -235,39 +276,52 @@ SArf <- function(formula,
     # Spatial CV results
     spatial_cv_results = cv_results,
     
-    # Model comparison
-    model_comparison = model_comparison$table,
+    # Model comparison (NULL if run_spatial_models = FALSE)
+    model_comparison = if (!is.null(model_comparison)) model_comparison$table else NULL,
     
-    # Individual spatial models (easy access)
-    ols_model = model_comparison$models$OLS,
-    sar_model = model_comparison$models$SAR,
-    sem_model = model_comparison$models$SEM,
-    sac_model = model_comparison$models$SAC,
-    
-    # All model details (for advanced users)
-    model_details = model_comparison$models,
+    # Individual spatial models (NULL if run_spatial_models = FALSE)
+    ols_model = ols_model,
+    sar_model = sar_model,
+    sem_model = sem_model,
+    sac_model = sac_model,
+    naive_rf_model = naive_rf_model,
     
     # Variable importance
     variable_importance = importance_results$table,
     importance_plot = importance_results$plot,
     
-    # ALE results
-    ale_results = ale_results$data,
-    ale_plots = ale_results$plots,
+    # ALE plots
+    ale_results = ale_results$results,
+    ale_plots = ale_results$plot,
     
-    # Mapping
+    # Map
     leaflet_map = leaflet_map,
     
     # Data and metadata
     data = data,
     formula = formula,
     spatial_weights = spatial_weights,
-    call = match.call()
+    call = match.call(),
+    
+    # Settings (for reference)
+    settings = list(
+      run_spatial_models = run_spatial_models,
+      k_neighbors = k_neighbors,
+      n_folds = n_folds,
+      n_bootstrap = n_bootstrap,
+      num_trees = num_trees
+    )
   )
   
   class(results) <- "SArf"
   
-  if (verbose) cat("\n=== ANALYSIS COMPLETE ===\n")
+  if (verbose) {
+    cat("\n=== ANALYSIS COMPLETE ===\n")
+    cat("Use print(results) for summary, plot(results) for visualizations\n")
+    if (!run_spatial_models) {
+      cat("Note: Spatial econometric models were not fitted (run_spatial_models = FALSE)\n")
+    }
+  }
   
   return(results)
 }
@@ -282,50 +336,38 @@ SArf <- function(formula,
 print.SArf <- function(x, ...) {
   cat("\n=== Spatial Autoregressive Random Forest Results ===\n\n")
   
-  cat("Formula:", deparse(x$formula), "\n")
-  cat("Observations:", nrow(x$data), "\n\n")
-  
-  cat("--- Spatial Autocorrelation Test ---\n")
-  cat("Moran's I:", round(x$moran_test$estimate[1], 4), "\n")
+  # Moran's I
+  cat("--- Spatial Autocorrelation (Moran's I) ---\n")
+  cat("Statistic:", round(x$moran_test$estimate[1], 4), "\n")
   cat("p-value:", format.pval(x$moran_test$p.value), "\n\n")
   
-  cat("--- Model Comparison ---\n")
-  print(x$model_comparison, row.names = FALSE)
-  cat("\n")
+  # Spatial CV performance
+  cat("--- Spatial CV Random Forest Performance ---\n")
+  cat("RMSE:", round(x$spatial_cv_results$metrics$rmse, 4), "\n")
+  cat("R²:", round(x$spatial_cv_results$metrics$r2, 4), "\n")
+  cat("Moran's I (residuals):", round(x$spatial_cv_results$metrics$morans_i, 4), "\n\n")
   
-  # Print summary of best spatial econometric model
-  cat("--- Best Spatial Econometric Model ---\n")
-  spatial_models <- x$model_comparison[x$model_comparison$Model != "RF_Spatial_CV", ]
-  best_spatial <- spatial_models[which.max(spatial_models$R2), ]
-  cat("Model:", best_spatial$Model, "\n")
-  cat("R²:", round(best_spatial$R2, 4), "\n")
-  cat("RMSE:", round(best_spatial$RMSE, 4), "\n")
-  cat("Moran's I (residuals):", round(best_spatial$Morans_I, 4), 
-      "( p =", format.pval(best_spatial$Morans_pval), ")\n\n")
-  
-  # Print model summary
-  best_model_name <- as.character(best_spatial$Model)
-  best_model_obj <- switch(best_model_name,
-                           "OLS" = x$ols_model,
-                           "SAR" = x$sar_model,
-                           "SEM" = x$sem_model,
-                           "SAC" = x$sac_model,
-                           NULL)
-  
-  if (!is.null(best_model_obj)) {
-    cat("Summary:\n")
-    print(summary(best_model_obj))
+  # Model comparison (if available)
+  if (!is.null(x$model_comparison)) {
+    cat("--- Model Comparison ---\n")
+    print(x$model_comparison, row.names = FALSE)
     cat("\n")
+  } else {
+    cat("--- Model Comparison ---\n")
+    cat("Spatial econometric models not fitted (run_spatial_models = FALSE)\n\n")
   }
   
-  cat("--- Variable Importance (Top 5) ---\n")
-  top5 <- head(x$variable_importance[order(-x$variable_importance$mean), ], 5)
+  # Top 5 important variables
+  cat("--- Top 5 Important Variables ---\n")
+  top5 <- head(x$variable_importance, 5)
   print(top5, row.names = FALSE)
   cat("\n")
   
   cat("--- Accessing Results ---\n")
   cat("Plots: plot(results) or results$moran_plot, results$importance_plot, results$ale_plots\n")
-  cat("Models: results$ols_model, results$sar_model, results$sem_model, results$sac_model\n")
+  if (!is.null(x$model_comparison)) {
+    cat("Models: results$ols_model, results$sar_model, results$sem_model, results$sac_model\n")
+  }
   cat("Map: results$leaflet_map\n")
   cat("Details: summary(results)\n")
 }
@@ -346,7 +388,8 @@ summary.SArf <- function(object, ...) {
   
   cat("Formula:", deparse(object$formula), "\n")
   cat("Observations:", nrow(object$data), "\n")
-  cat("Predictors:", length(all.vars(object$formula)) - 1, "\n\n")
+  cat("Predictors:", length(all.vars(object$formula)) - 1, "\n")
+  cat("Spatial models fitted:", object$settings$run_spatial_models, "\n\n")
   
   cat("=== Spatial Autocorrelation ===\n")
   cat("Moran's I:", round(object$moran_test$estimate[1], 4), "\n")
@@ -367,9 +410,15 @@ summary.SArf <- function(object, ...) {
   cat("p-value (residuals):", 
       format.pval(object$spatial_cv_results$metrics$morans_p), "\n\n")
   
-  cat("=== Model Comparison ===\n")
-  print(object$model_comparison, row.names = FALSE)
-  cat("\n")
+  # Model comparison (if available)
+  if (!is.null(object$model_comparison)) {
+    cat("=== Model Comparison ===\n")
+    print(object$model_comparison, row.names = FALSE)
+    cat("\n")
+  } else {
+    cat("=== Model Comparison ===\n")
+    cat("Spatial econometric models not fitted (run_spatial_models = FALSE)\n\n")
+  }
   
   cat("=== Variable Importance ===\n")
   print(object$variable_importance, row.names = FALSE)
@@ -386,48 +435,51 @@ summary.SArf <- function(object, ...) {
     cat("Access with: object$leaflet_map\n\n")
   }
   
-  cat("=== Spatial Econometric Models ===\n\n")
-  
-  # OLS Model
-  if (!is.null(object$ols_model)) {
-    cat(strrep("-", 78), "\n")
-    cat("OLS MODEL\n")
-    cat(strrep("-", 78), "\n")
-    print(summary(object$ols_model))
-    cat("\n")
+  # Spatial econometric models (if available)
+  if (object$settings$run_spatial_models) {
+    cat("=== Spatial Econometric Models ===\n\n")
+    
+    # OLS Model
+    if (!is.null(object$ols_model)) {
+      cat(strrep("-", 78), "\n")
+      cat("OLS MODEL\n")
+      cat(strrep("-", 78), "\n")
+      print(summary(object$ols_model))
+      cat("\n")
+    }
+    
+    # SAR Model
+    if (!is.null(object$sar_model)) {
+      cat(strrep("-", 78), "\n")
+      cat("SAR (SPATIAL LAG) MODEL\n")
+      cat(strrep("-", 78), "\n")
+      print(summary(object$sar_model))
+      cat("\n")
+    }
+    
+    # SEM Model
+    if (!is.null(object$sem_model)) {
+      cat(strrep("-", 78), "\n")
+      cat("SEM (SPATIAL ERROR) MODEL\n")
+      cat(strrep("-", 78), "\n")
+      print(summary(object$sem_model))
+      cat("\n")
+    }
+    
+    # SAC Model
+    if (!is.null(object$sac_model)) {
+      cat(strrep("-", 78), "\n")
+      cat("SAC (SPATIAL LAG + ERROR) MODEL\n")
+      cat(strrep("-", 78), "\n")
+      print(summary(object$sac_model))
+      cat("\n")
+    }
+    
+    cat("=== Quick Access ===\n")
+    cat("Individual models: summary(object$ols_model), summary(object$sar_model), etc.\n")
+    cat("Coefficients: coef(object$sar_model)\n")
+    cat("Spatial parameters: object$sar_model$rho, object$sem_model$lambda\n\n")
   }
-  
-  # SAR Model
-  if (!is.null(object$sar_model)) {
-    cat(strrep("-", 78), "\n")
-    cat("SAR (SPATIAL LAG) MODEL\n")
-    cat(strrep("-", 78), "\n")
-    print(summary(object$sar_model))
-    cat("\n")
-  }
-  
-  # SEM Model
-  if (!is.null(object$sem_model)) {
-    cat(strrep("-", 78), "\n")
-    cat("SEM (SPATIAL ERROR) MODEL\n")
-    cat(strrep("-", 78), "\n")
-    print(summary(object$sem_model))
-    cat("\n")
-  }
-  
-  # SAC Model
-  if (!is.null(object$sac_model)) {
-    cat(strrep("-", 78), "\n")
-    cat("SAC (SPATIAL LAG + ERROR) MODEL\n")
-    cat(strrep("-", 78), "\n")
-    print(summary(object$sac_model))
-    cat("\n")
-  }
-  
-  cat("=== Quick Access ===\n")
-  cat("Individual models: summary(object$ols_model), summary(object$sar_model), etc.\n")
-  cat("Coefficients: coef(object$sar_model)\n")
-  cat("Spatial parameters: object$sar_model$rho, object$sem_model$lambda\n\n")
   
   invisible(object)
 }
@@ -467,13 +519,19 @@ plot.SArf <- function(x, which = "all", ...) {
     # Plot 1: Moran's I
     print(x$moran_plot)
     
-    # Plot 2: Model Comparison (as barplot)
-    barplot(x$model_comparison$RMSE, 
-            names.arg = x$model_comparison$Model,
-            las = 2,
-            main = "Model Comparison (RMSE)",
-            ylab = "RMSE",
-            col = "steelblue")
+    # Plot 2: Model Comparison (as barplot) - only if models were fitted
+    if (!is.null(x$model_comparison)) {
+      barplot(x$model_comparison$RMSE, 
+              names.arg = x$model_comparison$Model,
+              las = 2,
+              main = "Model Comparison (RMSE)",
+              ylab = "RMSE",
+              col = "steelblue")
+    } else {
+      plot.new()
+      text(0.5, 0.5, "Model comparison not available\n(run_spatial_models = FALSE)", 
+           cex = 1.2)
+    }
     
     # Plot 3 & 4: Show importance and first ALE in base graphics style
     # (Print ggplots separately)
@@ -489,13 +547,17 @@ plot.SArf <- function(x, which = "all", ...) {
   } else if (which == "ale") {
     print(x$ale_plots)
   } else if (which == "comparison") {
-    print(ggplot2::ggplot(x$model_comparison, 
-                          ggplot2::aes(x = reorder(Model, -RMSE), y = RMSE)) +
-            ggplot2::geom_bar(stat = "identity", fill = "steelblue") +
-            ggplot2::coord_flip() +
-            ggplot2::labs(title = "Model Comparison",
-                         x = "Model", y = "RMSE") +
-            ggplot2::theme_minimal())
+    if (!is.null(x$model_comparison)) {
+      print(ggplot2::ggplot(x$model_comparison, 
+                            ggplot2::aes(x = reorder(Model, -RMSE), y = RMSE)) +
+              ggplot2::geom_bar(stat = "identity", fill = "steelblue") +
+              ggplot2::coord_flip() +
+              ggplot2::labs(title = "Model Comparison",
+                           x = "Model", y = "RMSE") +
+              ggplot2::theme_minimal())
+    } else {
+      message("Model comparison not available (run_spatial_models = FALSE)")
+    }
   } else {
     stop("Invalid 'which' argument. Choose from: 'all', 'moran', 'importance', 'ale', 'comparison'")
   }
@@ -531,6 +593,13 @@ plot.SArf <- function(x, which = "all", ...) {
 show_models <- function(x, model = "all") {
   if (!inherits(x, "SArf")) {
     stop("x must be a SArf object")
+  }
+  
+  # Check if spatial models were fitted
+  if (!x$settings$run_spatial_models) {
+    message("Spatial econometric models were not fitted (run_spatial_models = FALSE)")
+    message("Re-run SArf() with run_spatial_models = TRUE to fit these models.")
+    return(invisible(x))
   }
   
   models_to_show <- if (tolower(model) == "all") {
