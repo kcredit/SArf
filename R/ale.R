@@ -19,25 +19,33 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
   spatial_lag_name <- "spatial_lag"
   
   # Get top variables from importance table if provided
-  if (!is.null(importance_table)) {
-    # Separate spatial_lag from other variables
-    other_vars <- importance_table %>%
-      dplyr::arrange(desc(mean)) %>%
-      dplyr::filter(variable != spatial_lag_name) %>%
+  if (!is.null(importance_table) && nrow(importance_table) > 0) {
+    # Get all variables ordered by importance (descending)
+    all_vars_ordered <- importance_table %>%
+      dplyr::arrange(dplyr::desc(mean)) %>%
       dplyr::pull(variable)
-    
+
     # Check if spatial_lag is in importance table
-    has_spatial_lag <- spatial_lag_name %in% importance_table$variable
-    
-    # Select top variables: ensure spatial lag is included if present
+    has_spatial_lag <- spatial_lag_name %in% all_vars_ordered
+
+    # Select top variables, ensuring spatial_lag is included if present
     if (has_spatial_lag) {
-      # Take top (n_top_vars - 1) other variables plus spatial lag
-      top_vars <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+      spatial_lag_rank <- which(all_vars_ordered == spatial_lag_name)
+      if (spatial_lag_rank <= n_top_vars) {
+        # spatial_lag is already in top n, just take top n
+        top_vars <- head(all_vars_ordered, n_top_vars)
+      } else {
+        # spatial_lag not in top n, include it by taking (n-1) top vars + spatial_lag
+        other_vars <- all_vars_ordered[all_vars_ordered != spatial_lag_name]
+        top_vars_unordered <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+        # Reorder by importance
+        top_vars <- all_vars_ordered[all_vars_ordered %in% top_vars_unordered]
+      }
     } else {
       # No spatial lag, just take top n_top_vars
-      top_vars <- head(other_vars, n_top_vars)
+      top_vars <- head(all_vars_ordered, n_top_vars)
     }
-    
+
     if (verbose) {
       cat("  Using top", length(top_vars), "variables from importance ranking:\n")
       cat("   ", paste(top_vars, collapse = ", "), "\n")
@@ -45,11 +53,11 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
         cat("  (Spatial lag of dependent variable included)\n")
       }
     }
-    
+
   } else {
     # Fallback: Calculate from CV results (old method)
     all_importances <- cv_results$importances
-    
+
     importance_summary <- dplyr::bind_rows(
       lapply(seq_along(all_importances), function(i) {
         imp <- all_importances[[i]]
@@ -62,21 +70,25 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
     ) %>%
       dplyr::group_by(variable) %>%
       dplyr::summarise(mean_imp = mean(importance, na.rm = TRUE), .groups = 'drop') %>%
-      dplyr::arrange(desc(mean_imp))
-    
-    # Separate spatial lag
-    other_vars <- importance_summary %>%
-      dplyr::filter(variable != spatial_lag_name) %>%
-      dplyr::pull(variable)
-    
-    has_spatial_lag <- spatial_lag_name %in% importance_summary$variable
-    
+      dplyr::arrange(dplyr::desc(mean_imp))
+
+    # Get all variables ordered by importance
+    all_vars_ordered <- importance_summary$variable
+    has_spatial_lag <- spatial_lag_name %in% all_vars_ordered
+
     if (has_spatial_lag) {
-      top_vars <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+      spatial_lag_rank <- which(all_vars_ordered == spatial_lag_name)
+      if (spatial_lag_rank <= n_top_vars) {
+        top_vars <- head(all_vars_ordered, n_top_vars)
+      } else {
+        other_vars <- all_vars_ordered[all_vars_ordered != spatial_lag_name]
+        top_vars_unordered <- c(head(other_vars, n_top_vars - 1), spatial_lag_name)
+        top_vars <- all_vars_ordered[all_vars_ordered %in% top_vars_unordered]
+      }
     } else {
-      top_vars <- head(other_vars, n_top_vars)
+      top_vars <- head(all_vars_ordered, n_top_vars)
     }
-    
+
     if (verbose) {
       cat("  Calculating ALE for top", length(top_vars), "variables:\n")
       cat("   ", paste(top_vars, collapse = ", "), "\n")
@@ -181,6 +193,9 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
   
   # Create combined ALE plot (3x2 grid)
   if (nrow(ale_data) > 0) {
+    # Order variables by importance for facet display
+    ale_data$variable <- factor(ale_data$variable, levels = top_vars)
+
     ale_plots <- ggplot2::ggplot(
       ale_data,
       ggplot2::aes(x = x_smooth, y = ale_mean)
