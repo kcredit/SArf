@@ -71,7 +71,7 @@ This package emerged from research analyzing environmental health burdens and be
 - Reproducible workflow
 - Publication materials
 
-**📖 Publication:** Credit, K., Kumar, D., and Eccles, E. (2025). "Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland." *Proceedings of the 33rd GISRUK Conference.* DOI: [10.5281/zenodo.15183740](https://doi.org/10.5281/zenodo.15183740)
+**📖 Publication:** Credit, K., Kaur, D., and Eccles, E. (2026). "Analysing urban inequalities in environment and health at the neighbourhood scale in Dublin through a new open-access 'Health Rating Index'." *Wellbeing, Space and Society*, 10, 100356. DOI: [10.1016/j.wss.2026.100356](https://doi.org/10.1016/j.wss.2026.100356)
 
 The sample data included with this package (`dublin_sample.shp`) is a subset of 100 small areas from the full Dublin analysis, allowing users to quickly test the package and understand the methodology.
 
@@ -80,10 +80,10 @@ The sample data included with this package (`dublin_sample.shp`) is a subset of 
 If you use SArf in your research, please cite:
 
 ```bibtex
-@software{sarf2025,
+@software{sarf2026,
   title = {SArf: Spatial Autoregressive Random Forest},
   author = {Credit, Kevin},
-  year = {2025},
+  year = {2026},
   url = {https://github.com/kcredit/SArf}
 }
 ```
@@ -91,12 +91,14 @@ If you use SArf in your research, please cite:
 And if applicable, the methodological paper:
 
 ```bibtex
-@inproceedings{credit2025health,
-  title = {Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland},
-  author = {Credit, Kevin and Kumar, Damanpreet and Eccles, Elizabeth},
-  booktitle = {Proceedings of the 33rd GISRUK Conference},
-  year = {2025},
-  doi = {10.5281/zenodo.15183740}
+@article{credit2026health,
+  title = {Analysing urban inequalities in environment and health at the neighbourhood scale in Dublin through a new open-access 'Health Rating Index'},
+  author = {Credit, Kevin and Kaur, Damanpreet and Eccles, Emma},
+  journal = {Wellbeing, Space and Society},
+  volume = {10},
+  pages = {100356},
+  year = {2026},
+  doi = {10.1016/j.wss.2026.100356}
 }
 ```
 

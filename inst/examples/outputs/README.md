@@ -97,4 +97,4 @@ Typical results from the Dublin health data:
 
 For complete outputs and reproducible analysis:
 - **GitHub:** https://github.com/kcredit/health-rating-index
-- **Publication:** https://doi.org/10.5281/zenodo.15183740
+- **Publication:** https://doi.org/10.1016/j.wss.2026.100356

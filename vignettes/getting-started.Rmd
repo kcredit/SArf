@@ -402,8 +402,8 @@ if (sum(verification_results$any_from_test) == 0 && all(verification_results$mat
 
 For the complete analysis and reproducible code: - **GitHub:**
 <https://github.com/kcredit/health-rating-index> - **Publication:**
-Credit et al. (2025), GISRUK Conference Proceedings - **DOI:**
-10.5281/zenodo.15183740
+Credit et al. (2026), Wellbeing, Space and Society - **DOI:**
+10.1016/j.wss.2026.100356
 
 # Interpretation Guide
 
@@ -455,12 +455,13 @@ coordinates
 # Citation
 
 ```         
-Credit, K. (2025). SArf: Spatial Autoregressive 
+Credit, K. (2026). SArf: Spatial Autoregressive
 Random Forest. https://github.com/YOUR-USERNAME/SArf
 
-Credit, K., Kumar, D., & Eccles, E. (2025). Exploring the 
-transport-health-environment nexus through a new 'Health Rating Index'. 
-Proceedings of the 33rd GISRUK Conference. DOI: 10.5281/zenodo.15183740
+Credit, K., Kaur, D., & Eccles, E. (2026). Analysing urban inequalities
+in environment and health at the neighbourhood scale in Dublin through a
+new open-access 'Health Rating Index'. Wellbeing, Space and Society, 10,
+100356. DOI: 10.1016/j.wss.2026.100356
 ```
 
 # Session Info

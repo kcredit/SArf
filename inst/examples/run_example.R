@@ -4,7 +4,7 @@
 # the Health Rating Index project for Dublin, Ireland.
 #
 # Project: https://github.com/kcredit/health-rating-index
-# Publication: https://doi.org/10.5281/zenodo.15183740
+# Publication: https://doi.org/10.1016/j.wss.2026.100356
 # ============================================================================
 
 # Load libraries

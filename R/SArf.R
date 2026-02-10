@@ -102,10 +102,10 @@
 #' }
 #'
 #' @references
-#' Credit, K., Damanpreet, K., and Eccles, E. (2025). Exploring the
-#' transport-health-environment nexus through a new 'Health Rating Index'
-#' for Dublin, Ireland. Proceedings of the 33rd GISRUK Conference.
-#' DOI: 10.5281/zenodo.15183740
+#' Credit, K., Kaur, D., and Eccles, E. (2026). Analysing urban inequalities
+#' in environment and health at the neighbourhood scale in Dublin through a
+#' new open-access 'Health Rating Index'. Wellbeing, Space and Society, 10,
+#' 100356. DOI: 10.1016/j.wss.2026.100356
 #'
 #' @export
 SArf <- function(formula,

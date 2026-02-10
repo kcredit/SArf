@@ -345,10 +345,10 @@ SArf(
 When publishing, cite as:
 
 ```bibtex
-@software{credit2025sarf,
-  author = {Credit, Kevin and Damanpreet, Kaur and Eccles, Emma},
+@software{credit2026sarf,
+  author = {Credit, Kevin and Kaur, Damanpreet and Eccles, Emma},
   title = {SArf: Spatial Autoregressive Random Forest},
-  year = {2025},
+  year = {2026},
   url = {https://github.com/yourusername/SArf},
   note = {R package version 0.1.0}
 }
@@ -356,13 +356,16 @@ When publishing, cite as:
 
 Based on methodology from:
 ```bibtex
-@inproceedings{credit2025health,
-  title={Exploring the transport-health-environment nexus through 
-         a new 'Health Rating Index' for Dublin, Ireland},
-  author={Credit, Kevin and Damanpreet, Kaur and Eccles, Emma},
-  booktitle={Proceedings of the 33rd GISRUK Conference},
-  year={2025},
-  doi={10.5281/zenodo.15183740}
+@article{credit2026health,
+  title={Analysing urban inequalities in environment and health at the
+         neighbourhood scale in Dublin through a new open-access
+         'Health Rating Index'},
+  author={Credit, Kevin and Kaur, Damanpreet and Eccles, Emma},
+  journal={Wellbeing, Space and Society},
+  volume={10},
+  pages={100356},
+  year={2026},
+  doi={10.1016/j.wss.2026.100356}
 }
 ```
 

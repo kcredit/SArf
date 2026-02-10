@@ -7,7 +7,7 @@ Full dataset from the **Health Rating Index for Dublin** project analyzing envir
 ### Source
 
 - **Project GitHub:** https://github.com/kcredit/health-rating-index
-- **Publication:** Credit, K., Kumar, D., and Eccles, E. (2025). "Exploring the transport-health-environment nexus through a new 'Health Rating Index' for Dublin, Ireland." Proceedings of the 33rd GISRUK Conference. DOI: 10.5281/zenodo.15183740
+- **Publication:** Credit, K., Kaur, D., and Eccles, E. (2026). "Analysing urban inequalities in environment and health at the neighbourhood scale in Dublin through a new open-access 'Health Rating Index'." Wellbeing, Space and Society, 10, 100356. DOI: 10.1016/j.wss.2026.100356
 
 ### Variables
 
@@ -58,8 +58,8 @@ write.csv(results$model_comparison, "output/model_comparison.csv")
 If using this data in publications, please cite:
 
 ```
-Credit, K., Kumar, D., and Eccles, E. (2025). Exploring the 
-transport-health-environment nexus through a new 'Health Rating Index' 
-for Dublin, Ireland. Proceedings of the 33rd GISRUK Conference. 
-DOI: 10.5281/zenodo.15183740
+Credit, K., Kaur, D., and Eccles, E. (2026). Analysing urban inequalities
+in environment and health at the neighbourhood scale in Dublin through a
+new open-access 'Health Rating Index'. Wellbeing, Space and Society, 10,
+100356. DOI: 10.1016/j.wss.2026.100356
 ```

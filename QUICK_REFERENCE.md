@@ -204,7 +204,7 @@ example(SArf)
 
 - **GitHub:** github.com/yourusername/SArf
 - **Issues:** github.com/yourusername/SArf/issues
-- **Paper:** doi.org/10.5281/zenodo.15183740
+- **Paper:** doi.org/10.1016/j.wss.2026.100356
 
 ## 📄 Citation
 
@@ -213,10 +213,10 @@ citation("SArf")
 ```
 
 ```bibtex
-@software{credit2025sarf,
-  author = {Credit, Kevin and Damanpreet, Kaur and Eccles, Emma},
+@software{credit2026sarf,
+  author = {Credit, Kevin and Kaur, Damanpreet and Eccles, Emma},
   title = {SArf: Spatial Autoregressive Random Forest},
-  year = {2025},
+  year = {2026},
   url = {https://github.com/yourusername/SArf}
 }
 ```
