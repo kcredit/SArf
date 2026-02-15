@@ -126,6 +126,10 @@ library(SArf)
 
 See [TROUBLESHOOTING_GGPLOT2.md](../TROUBLESHOOTING_GGPLOT2.md) for detailed solutions.
 
+## AI Assistance Disclosure
+
+This repository and code was developed with assistance from [Claude Code](https://claude.ai/claude-code). All AI-generated code was reviewed, tested, and validated by the author, who takes full responsibility for the accuracy and reproducibility of all computational results.
+
 ## Contact
 
 Kevin Credit - kevin.credit@mu.ie - Maynooth University
