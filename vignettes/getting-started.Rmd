@@ -80,10 +80,10 @@ data <- st_read(data_path)
 
 # Check the data
 cat("Dataset size:", nrow(data), "small areas\n")
-summary(data$HRI_gaus_e)
+summary(data$HRI_gaus_p)
 
 # Variables included:
-# - HRI_gaus_e: Health Rating Index (outcome)
+# - HRI_gaus_p: Health Rating Index (outcome)
 # - In22_ED: Deprivation index
 # - NoAuto_p: % households without car
 # - POPD: Population density
@@ -94,11 +94,9 @@ summary(data$HRI_gaus_e)
 # Clean the data
 data_clean <- data %>%
   # Remove missing outcome
-  filter(!is.na(HRI_gaus_e)) %>%
-  # Ensure numeric
-  mutate(your_outcome_variable = as.numeric(HRI_gaus_e)) %>%
-  # Remove missing predictors (add all your predictor names)
-  filter(complete.cases(HRI_gaus_e, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
+  filter(!is.na(HRI_gaus_p)) %>%
+  # Remove missing predictors
+  filter(complete.cases(HRI_gaus_p, In22_ED, NoAuto_p, POPD, log_dist, ov60, nonIrish)) %>%
   # Fix invalid geometries
   filter(st_is_valid(.))
 
@@ -140,7 +138,7 @@ if (n_rows < 1000) {
   # Very large - sample first
   cat("Very large dataset. Sampling 3000 rows...\n")
   set.seed(1111)
-  data <- slice_sample(data_clean, n = 3000)
+  data_clean <- slice_sample(data_clean, n = 3000)
   n_folds <- 3
   n_bootstrap <- 5
   num_trees <- 250
@@ -152,16 +150,6 @@ cat("If your data are very large, you can alternatively (or additionally) increa
     County: 12500-25000m
     Region/Country: 50000-100000m", "\n")
 
-# Get bounding box of your data
-bbox <- st_bbox(data)
-
-# Calculate width and height (in meters if projected)
-width <- bbox["xmax"] - bbox["xmin"]
-height <- bbox["ymax"] - bbox["ymin"]
-
-# Use smaller dimension (more conservative)
-min_dimension <- min(width, height)/3
-
 ```
 
 ## Run Analysis
@@ -169,17 +157,17 @@ min_dimension <- min(width, height)/3
 ```{r run_dublin}
 # Run SArf analysis
 results <- SArf(
-  HRI_gaus_e ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
-  data = data,
+  HRI_gaus_p ~ In22_ED + NoAuto_p + POPD + log_dist + ov60 + nonIrish,
+  data = data_clean,
   k_neighbors = 20,             # Number of neighbors for spatial weights
-  n_folds = n_folds,           # Spatial CV folds
-  n_bootstrap = n_bootstrap,   # Bootstrap iterations
-  num_trees = num_trees,       # Trees in random forest
-  include_naive_rf = TRUE,     # For comparison with "naive" random forest
-  naive_test_fraction = 0.2,   
-  create_map = TRUE,           # Spatial folds map
-  block_range = min_dimension, # Size of the spatial blocks in units of metres
-  verbose = TRUE               # Print progress
+  n_folds = n_folds,            # Spatial CV folds
+  n_bootstrap = n_bootstrap,    # Bootstrap iterations
+  num_trees = num_trees,        # Trees in random forest
+  include_naive_rf = TRUE,      # For comparison with "naive" random forest
+  naive_test_fraction = 0.2,
+  create_map = TRUE,            # Spatial folds map
+  block_range = 5000,           # Size of the spatial blocks in metres
+  verbose = TRUE                # Print progress
 )
 ```
 
@@ -251,7 +239,7 @@ cat("Test observations:", length(test_idx), "\n\n")
 # ========================================
 # 2. Get coordinates and extract k
 # ========================================
-all_coords <- st_coordinates(st_centroid(st_geometry(data)))
+all_coords <- st_coordinates(st_centroid(st_geometry(data_clean)))
 train_coords <- all_coords[train_idx, , drop = FALSE]
 
 # Extract k from spatial_weights
@@ -293,7 +281,7 @@ for (i in 1:length(test_idx)) {
   neighbor_rows <- train_idx[nearest_indices]
   
   # Calculate spatial lag with W-style weights (simple mean)
-  calculated_lag <- mean(data[[response_var]][neighbor_rows])
+  calculated_lag <- mean(data_clean[[response_var]][neighbor_rows])
   
   # Check if any neighbors are from test set (should be NONE!)
   any_from_test <- any(neighbor_rows %in% test_idx)
@@ -435,7 +423,7 @@ Credit et al. (2026), Wellbeing, Space and Society - **DOI:**
 parameters - 3000: Sample or reduce parameters
 
 **Block Range:** - Too small → "same area" error - Too large → empty
-folds - Start with min(width, height) / 3
+folds - Use a literal value in metres appropriate to your study area (e.g., 5000 for a city)
 
 **Performance:** - 500 obs: \~5 min - 1000 obs: \~10 min - 2000 obs:
 \~20 min - 3000 obs: \~45 min
@@ -456,7 +444,7 @@ coordinates
 
 ```         
 Credit, K. (2026). SArf: Spatial Autoregressive
-Random Forest. https://github.com/YOUR-USERNAME/SArf
+Random Forest. https://github.com/kcredit/SArf
 
 Credit, K., Kaur, D., & Eccles, E. (2026). Analysing urban inequalities
 in environment and health at the neighbourhood scale in Dublin through a

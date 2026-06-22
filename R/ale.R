@@ -125,22 +125,27 @@ calculate_ale_ci <- function(data, formula, cv_results, spatial_weights,
       tryCatch({
         # Check that variable exists in training data
         if (var %in% names(model_obj$train_data)) {
-          # Calculate ALE using ALEPlot package
-          ale_obj <- ALEPlot::ALEPlot(
-            X = model_obj$train_data,
-            X.model = model_obj$model,
-            pred.fun = function(X.model, newdata) {
-              predict(X.model, newdata)$predictions
-            },
-            J = which(names(model_obj$train_data) == var),
-            K = 50
+          # Calculate ALE using iml package
+          feature_data <- model_obj$train_data[
+            , !names(model_obj$train_data) %in% response_var, drop = FALSE
+          ]
+          predictor <- iml::Predictor$new(
+            model   = model_obj$model,
+            data    = feature_data,
+            predict.function = function(model, newdata) {
+              predict(model, newdata)$predictions
+            }
           )
-          
+          ale_obj <- iml::FeatureEffect$new(
+            predictor, feature = var, method = "ale", grid.size = 50
+          )
+          ale_df <- ale_obj$results
+
           var_ales[[i]] <- data.frame(
             variable = var,
             iteration = i,
-            x = ale_obj$x.values,
-            ale = ale_obj$f.values,
+            x        = ale_df[[var]],
+            ale      = ale_df$.value,
             stringsAsFactors = FALSE
           )
         }
